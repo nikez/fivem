@@ -38,7 +38,6 @@ void fiDeviceRelative::Mount(const char* mountPoint)
 }
 
 //// ---- fiPackfile ---- ////
-#if 0
 hook::thiscall_stub<void(fiPackfile*, int)>fiPackfile__ctor([]()
 {
 	return hook::pattern("48 63 FA 48 89 01 48 8B D9 48 8D 0D").count(1).get(0).get<void>(-0x20);
@@ -84,7 +83,6 @@ void fiPackfile::ClosePackfile()
 {
 	return fiPackfile__closeArchive(this);
 }
-#endif
 
 static HookFunction hookFunction([]()
 {

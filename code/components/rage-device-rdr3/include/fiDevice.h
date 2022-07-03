@@ -392,7 +392,6 @@ public:
 };
 
 // fiPackfile8
-#if 0
 class DEVICE_EXPORT __declspec(novtable) fiPackfile : public fiDeviceImplemented
 {
 private:
@@ -420,5 +419,4 @@ public:
 	// closes the package file
 	void ClosePackfile();
 };
-#endif
 }
