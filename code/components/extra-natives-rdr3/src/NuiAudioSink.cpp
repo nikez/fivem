@@ -41,7 +41,10 @@
 
 static concurrency::concurrent_queue<std::function<void()>> g_mainQueue;
 constexpr int MAX_NUM_SUBMIXES = 40;
-constexpr int MAX_DEFAULT_SUBMIXES = 0x1C;
+constexpr int MAX_DEFAULT_SUBMIXES = 14; //28;
+constexpr int MAX_DEFAULT_ALLOCATION_BUCKETS = 8;
+
+//#define _TODO_REMOVE_DISABLE_NATIVE_AUDIO
 
 namespace rage
 {
@@ -1231,7 +1234,7 @@ void MumbleAudioEntity::MInit()
 		}
 	}
 
-	initValues.SetAllocationBucket(12 + m_soundBucket);
+	initValues.SetAllocationBucket(MAX_DEFAULT_ALLOCATION_BUCKETS + m_soundBucket);
 
 	// TODO: Investigate initValues likely broken offsets still
 	// If fixed persist call should go through.
@@ -1691,8 +1694,8 @@ static bool (*g_orig_audConfig_GetData_uint)(const char*, uint32_t&);
 static bool audConfig_GetData_uint(const char* param, uint32_t& out)
 {
 	if (strcmp(param, "engineSettings_NumBuckets") == 0)
-	{
-		out = 12 + kExtraAudioBuckets;
+	{		
+		out = MAX_DEFAULT_ALLOCATION_BUCKETS + kExtraAudioBuckets;
 		return true;
 	}
 
@@ -1701,6 +1704,10 @@ static bool audConfig_GetData_uint(const char* param, uint32_t& out)
 
 static HookFunction hookFunction([]()
 {
+	#ifdef _TODO_REMOVE_DISABLE_NATIVE_AUDIO
+	return;
+	#endif
+
 	//g_preferenceArray = hook::get_address<uint32_t*>(hook::get_pattern("48 8D 15 ? ? ? ? 8D 43 01 83 F8 02 77 2D")); // NOT NEEDED
 
 	{
@@ -1754,7 +1761,8 @@ static HookFunction hookFunction([]()
 
 		updateVoiceMetricsStub.origCall = origUpdateVoiceMetrics;
 
-		hook::call(location, updateVoiceMetricsStub.GetCode());
+		auto temp = updateVoiceMetricsStub.GetCode();
+		hook::call(location, temp);
 	}
 
 	// intervene in audEnvironment::ComputeVoiceRoutes
@@ -1767,7 +1775,7 @@ static HookFunction hookFunction([]()
 				sub(rsp, 0x28);
 
 				mov(rcx, qword_ptr[r15]);
-				lea(rdx, qword_ptr[rsp + 0x178]);
+				lea(rdx, qword_ptr[rsp + 0x3C/*0x178*/]);
 
 				mov(rax, (uint64_t)DoVoiceRoute);
 				call(rax);
@@ -1791,8 +1799,7 @@ static HookFunction hookFunction([]()
 			}
 		} computeVoiceRoutesStub;
 
-		auto location = hook::get_pattern("49 8B FE B3 7F 49 8B 07 48 8B"); // DONE
-		//hook::nop(location, 6);
+		auto location = hook::get_pattern("49 8B FE B3 7F 49 8B 07 48 8B"); // DONE		
 		hook::call(location, computeVoiceRoutesStub.GetCode());
 	}
 
@@ -1815,10 +1822,9 @@ static HookFunction hookFunction([]()
 	}
 
 	// custom audio poll stuff
-	{
-		//auto offset = (xbr::IsGameBuildOrGreater<2372>()) ? -0x14 : -0x11;
+	{		
 		auto location = hook::get_pattern("B8 ? ? ? ? 48 2B E0 4C 8D 6C 24 ? 41 8B 55 00", -0x2F);
-		//void* x = (void*)0x1425CB318;
+		
 		MH_Initialize();
 		MH_CreateHook(location, GenerateFrameHook, (void**)&g_origGenerateFrame);
 		MH_EnableHook(location);
@@ -1829,6 +1835,9 @@ rage::audDspEffect* MakeRadioFX();
 
 static InitFunction initFunction([]()
 {
+	#ifdef _TODO_REMOVE_DISABLE_NATIVE_AUDIO
+	return;
+	#endif
 	fx::ScriptEngine::RegisterNativeHandler("CREATE_AUDIO_SUBMIX", [](fx::ScriptContext& ctx)
 	{
 		std::string name = ctx.CheckArgument<const char*>(0);
@@ -2103,7 +2112,8 @@ static InitFunction initFunction([]()
 		*sink = ref;
 	});
 
-	OnSetMumbleVolume.Connect([](float volume) {
+	OnSetMumbleVolume.Connect([](float volume)
+	{
 		auto controllerMgr = rage::audCategoryControllerManager::GetInstance();
 
 		if (!controllerMgr)
