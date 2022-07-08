@@ -151,18 +151,17 @@ static void rage__audMixerDevice__GeneratePcmV3(rage::audMixerDevice* thisptr)
 					continue;
 				}
 			}
-
-			if (wavePlayer && *(uint64_t*)wavePlayer == 0x14365EC98)
+						
+			if (wavePlayer->skip_frame != 0xFFFF && *(uint64_t*)wavePlayer == 0x14365E560)
 			{
 				int x = 0;
 			}
 
-	/*		if (wavePlayer->skip_frame == 0xFFFF)
+			if (wavePlayer->skip_frame == 0xFFFF)
 			{
 				wavePlayer->SkipFrame();
 			}
-			else*/
-			// TODO: Fix SkipFrame-logic
+			else			
 			{
 				wavePlayer->GenerateFrame();
 			}
@@ -230,8 +229,10 @@ static HookFunction hookFunction([]()
 {
 	{
 		//auto location = hook::get_pattern<char>("75 17 40 38 2D ? ? ? ? 74 0E 39 2D", 5);
-		audioNotFocused = (bool*)malloc(1); // hook::get_address<bool*>(location);
-		muteOnFocusLoss = (int*)malloc(4); // hook::get_address<int*>(location + 8);
+		audioNotFocused = (bool*)malloc(1); 
+		//*audioNotFocused = false;			// hook::get_address<bool*>(location);
+		muteOnFocusLoss = (int*)malloc(4);	
+		//*muteOnFocusLoss = 0;				// hook::get_address<int*>(location + 8);
 	}
 	
 	{

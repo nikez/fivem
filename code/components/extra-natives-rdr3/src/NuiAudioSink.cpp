@@ -41,7 +41,7 @@
 
 static concurrency::concurrent_queue<std::function<void()>> g_mainQueue;
 constexpr int MAX_NUM_SUBMIXES = 40;
-constexpr int MAX_DEFAULT_SUBMIXES = 14; //28;
+constexpr int MAX_DEFAULT_SUBMIXES = 13; //28;
 constexpr int MAX_DEFAULT_ALLOCATION_BUCKETS = 8;
 
 //#define _TODO_REMOVE_DISABLE_NATIVE_AUDIO
@@ -101,7 +101,7 @@ namespace rage
 
 	static hook::thiscall_stub<void(audMixerSubmix* self, int slot, audDspEffect* effect, uint32_t mask)> _audMixerSubmix_SetEffect([]
 	{
-		return hook::get_pattern("0D ? ? ? ? 4C 89 44 24 ? 48 8D 54 24 ? 89 44 24 20 ", -0x11); // DONE
+		return hook::get_pattern("0D ? ? ? ? 4C 89 44 24 ? 48 8D 54 24 ? 89 44 24 20", -0x11); // DONE
 	});
 
 	static hook::thiscall_stub<void(audMixerSubmix* self, int slot, uint32_t hash, uint32_t value)> _audMixerSubmix_SetEffectParam_int([]
@@ -241,8 +241,6 @@ namespace rage
 		static audMixerDevice** sm_Mixer;
 	};
 
-	class audRequestedSettings;
-
 	class audSound
 	{
 	public:
@@ -262,7 +260,7 @@ namespace rage
 
 		void StopAndForget(bool a1);
 
-		audRequestedSettings* GetRequestedSettings();
+		class audRequestedSettings* GetRequestedSettings();
 
 	public:
 		char pad[141 - 8];
@@ -334,21 +332,16 @@ namespace rage
 		uint32_t m_f54; // +84
 	};
 
+	#pragma warning(disable:6031)
 	audReferencedRingBuffer::audReferencedRingBuffer()
 	{
-		m_data = nullptr;
-		m_size = 0;
-
-		m_f10_0 = 0;
-		m_f14_0 = 0;
-		m_f18_0 = 0;
-		m_f48_0 = false;
-		m_initialized = false;
-
+		memset(this, 0, offsetof(audReferencedRingBuffer, m_f54) + sizeof(m_f54));		
+		
 		m_usageCount = 1;
 
 		InitializeCriticalSectionAndSpinCount(&m_lock, 1000);
 	}
+	#pragma warning(default : 6031)
 
 	audReferencedRingBuffer::~audReferencedRingBuffer()
 	{
@@ -637,119 +630,33 @@ namespace rage
 		audEntity();
 
 		virtual ~audEntity();
-
-		virtual void pad_8() = 0;
-
-		virtual void Init();
-
-		virtual void Shutdown();
-
-		virtual void StopAllSounds(bool);
-
-		virtual void PreUpdateService(uint32_t)
-		{
-			int x = 0;
-		}
-
-		virtual void PostUpdate()
-		{
-			int x = 0;
-		}
-
-		virtual void UpdateSound(rage::audSound*, rage::audRequestedSettings*, uint32_t)
-		{
-			int x = 0;
-		}
-
-		virtual bool IsUnpausable()
-		{
-			return false;
-		}
-
-		virtual uint32_t QuerySoundNameFromObjectAndField(const uint32_t*, uint32_t, const rage::audSound*)
-		{
-			return 0;
-		}
-
-		virtual void QuerySpeechVoiceAndContextFromField(uint32_t, uint32_t&, uint32_t&)
-		{
-			int x = 0;
-		}
-
-		virtual rage::Vec3V GetPosition()
-		{
-			return {0.f, 0.f, 0.f, 0.f};
-		}
-
-		virtual rage::audOrientation GetOrientation()
-		{
-			return { 0.f, 0.f };
-		}
-
-		virtual uint64_t InitializeEntityVariables(uint64_t a2)
-		{
-			*(uint64_t*)a2 = 0xFFFFFFFF;
-			*(uint64_t*)(a2 + 4) = 0xFFFFF;
-			return a2;
-		}
-
-		virtual void* GetOwningEntity()
-		{
-			return nullptr;
-		}
-
-		virtual int unk_78()
-		{
-			return 0;
-		}
-
-		virtual int unk_86()
-		{
-			return 0;
-		}
-
-		virtual uint64_t unk_94(uint64_t a2)
-		{
-			*(uint64_t*)a2 = 0;
-			return 0;
-		}
-
-		virtual uint64_t unk_102(uint64_t a2)
-		{
-			struct _tmp
-			{
-				uint32_t a;
-				uint32_t b;
-			};
-			auto x = new _tmp;
-			x->a = 0;
-			x->b = 2147876864;
-			*(uint64_t*)a2 = 0;
-			return (uint64_t)x;
-		}
-
-		virtual void unk_110()
-		{
-			int x = 1;
-		}
-
-		virtual uint64_t unk_118(uint64_t a2)
-		{
-			m_12 = -1;
-			return 0xFFFFFFFF;
-		}
-
-		virtual void unk_126()
-		{
-			int x = 1;
-		}
+		virtual void unk_0x8();
+		virtual void Init();		
+		virtual void Shutdown();		
+		virtual void StopAllSounds(bool a1);		
+		virtual void PreUpdateService(uint32_t a1);		
+		virtual void PreUpdateServiceInternal(uint32_t a1);		
+		virtual void PostUpdate();		
+		virtual void UpdateSound(rage::audSound* a1, rage::audRequestedSettings* a2, uint32_t a3);		
+		virtual bool HasPendingAnimEvents();		
+		virtual bool HasPendingDeferredSounds();	
+		virtual void unk_0x58();		
+		virtual bool IsUnpausable();		
+		virtual uint32_t QuerySoundNameFromObjectAndField(const uint32_t* a1, uint32_t a2, const rage::audSound* a3);
+		virtual void QuerySpeechVoiceAndContextFromField(uint32_t a1, uint32_t& a2, uint32_t& a3);		
+		virtual uint64_t GetEnvironmentGroup(bool a1);		
+		virtual uint64_t GetEnvironmentGroupReadOnly();		
+		virtual rage::Vec3V GetPosition();		
+		virtual rage::audOrientation GetOrientation();		
+		virtual void unk_0x98();		
+		virtual uint64_t InitializeEntityVariables();	
+		virtual void unk_0xA8();
 
 		void CreateSound_PersistentReference(const char* name, audSound** outSound, const audSoundInitParams& params);
-
 		void CreateSound_PersistentReference(uint32_t nameHash, audSound** outSound, const audSoundInitParams& params);
 
 	private:
-		char m_pad[8];
+		char m_pad[8] = {};
 
 		uint16_t m_entityId{
 			0xffff
@@ -779,10 +686,8 @@ namespace rage
 	});
 
 	static hook::cdecl_stub<void(audEntity*, uint32_t, audSound**, const audSoundInitParams&)> _audEntity_CreateSound_PersistentReference_uint([]()
-	{
-		//return (void*)0x1425C4DC8;
-		return (void*)0x1425C4F00;
-		 //hook ::get_pattern<char>("81 FD ? ? ? ? 74 4F 66 39 5F 10 74 49 48 8D 4C 24 ? E8", -0x4c); // done? E8 ? ? ? ? 4D 39 2E
+	{	
+		return hook ::get_pattern("48 89 78 20 41 56 48 81 EC ? ? ? ? 83 79 14 00 49 8B", -0x18);
 	});
 
 	void audEntity::CreateSound_PersistentReference(const char* name, audSound** outSound, const audSoundInitParams& params)
@@ -791,11 +696,8 @@ namespace rage
 	}
 
 	void audEntity::CreateSound_PersistentReference(uint32_t nameHash, audSound** outSound, const audSoundInitParams& params)
-	{
-		int y = 0;
-		_audEntity_CreateSound_PersistentReference_uint(this, nameHash, outSound, params);
-		int x = 0;
-		//return _audEntity_CreateSound_PersistentReference_uint(this, nameHash, outSound, params);
+	{		
+		return _audEntity_CreateSound_PersistentReference_uint(this, nameHash, outSound, params);		
 	}
 
 	static hook::thiscall_stub<void(audEntity*)> rage__audEntity__Init([]()
@@ -811,7 +713,22 @@ namespace rage
 	static hook::thiscall_stub<void(audEntity*, bool)> rage__audEntity__StopAllSounds([]()
 	{
 		return hook::get_pattern("48 83 EC 28 B8 ? ? ? ? 66 39 41 10 74 12"); // DONE
+	});		
+
+	static hook::thiscall_stub<bool(audEntity*)> rage__audEntity__HasPendingDeferredSounds([]()
+	{
+		return hook::get_pattern("44 0F B7 05 ? ? ? ? 33 D2 4D 85 C0 74 20 48 8B 05");
 	});
+
+	static hook::thiscall_stub<uint32_t(audEntity*, const uint32_t* a1, uint32_t a2, const rage::audSound* a3)> rage__audEntity__QuerySoundNameFromObjectAndField([]()
+	{
+		return hook::get_pattern("8B 05 ? ? ? ? 89 02 48 8B C2 C7");
+	});
+
+	void audEntity::unk_0x8()
+	{
+	
+	}
 
 	void audEntity::Init()
 	{
@@ -823,9 +740,95 @@ namespace rage
 		rage__audEntity__Shutdown(this);
 	}
 
-	void audEntity::StopAllSounds(bool a)
+	void audEntity::StopAllSounds(bool a1)
 	{
-		rage__audEntity__StopAllSounds(this, a);
+		rage__audEntity__StopAllSounds(this, a1);
+	}
+
+	void audEntity::PreUpdateService(uint32_t a1)
+	{
+		
+	}
+
+	void audEntity::PreUpdateServiceInternal(uint32_t a1)
+	{
+		
+	}
+
+	void audEntity::PostUpdate()
+	{
+		
+	}
+
+	void audEntity::UpdateSound(rage::audSound* a1, rage::audRequestedSettings* a2, uint32_t a3)
+	{
+		
+	}
+
+	bool audEntity::HasPendingAnimEvents()
+	{
+		return false;
+	}
+
+	bool audEntity::HasPendingDeferredSounds()
+	{		
+		return rage__audEntity__HasPendingDeferredSounds(this);
+	}
+
+	void audEntity::unk_0x58()
+	{
+		
+	}
+
+	bool audEntity::IsUnpausable()
+	{
+		return false;
+	}
+
+	uint32_t audEntity::QuerySoundNameFromObjectAndField(const uint32_t* a1, uint32_t a2, const rage::audSound* a3)
+	{
+		return rage__audEntity__QuerySoundNameFromObjectAndField(this, a1, a2, a3);
+	}
+
+	void audEntity::QuerySpeechVoiceAndContextFromField(uint32_t a1, uint32_t& a2, uint32_t& a3)
+	{
+		
+	}
+
+	uint64_t audEntity::GetEnvironmentGroup(bool a1)
+	{
+		return 0;
+	}
+
+	uint64_t audEntity::GetEnvironmentGroupReadOnly()
+	{
+		return 0;
+	}
+
+	rage::Vec3V audEntity::GetPosition()
+	{
+		return { 0.f, 0.f, 0.f, 0.f };
+	}
+
+	rage::audOrientation audEntity::GetOrientation()
+	{
+		return { 0.f, 0.f };
+	}
+
+	void audEntity::unk_0x98()
+	{
+		
+	}
+
+	uint64_t audEntity::InitializeEntityVariables()
+	{
+		m_12 = -1;
+		return 0xFFFFFFFF;
+	}
+
+	void audEntity::unk_0xA8()
+	{
+	
 	}
 
 	audEntity* g_frontendAudioEntity;
@@ -928,10 +931,8 @@ namespace rage
 		uint32_t size; // +68
 		uint8_t pad4[11]; // +72
 		uint8_t frameOffset;
-	};
-	constexpr int test = offsetof(audStreamPlayer, frameOffset);
-	constexpr int test2 = offsetof(audStreamPlayer, ringBuffer);
-	}
+	};	
+}
 
 class naEnvironmentGroup : public rage::audEnvironmentGroupInterface
 {
@@ -962,8 +963,7 @@ static hook::thiscall_stub<void(naEnvironmentGroup*, const rage::Vec3V& position
 
 static hook::thiscall_stub<void(naEnvironmentGroup*, rage::fwInteriorLocation)> _naEnvironmentGroup_setInteriorLocation([]()
 {
-	return hook::get_pattern("89 54 24 10 53 48 83 EC 20 80"); // DONE
-	//return hook::get_pattern("48 85 D2 74 27 53 48 83 EC 20 48 8B C2 48 8B D9 48 8B C8 48 8D 54"); // DONE
+	return hook::get_pattern("89 54 24 10 53 48 83 EC 20 80"); // DONE	
 });
 
 naEnvironmentGroup* naEnvironmentGroup::Create()
@@ -1010,9 +1010,7 @@ public:
 	}
 
 	virtual ~MumbleAudioEntity() override;
-
-	virtual void pad_8() override;
-
+		
 	virtual void Init() override;
 
 	virtual void Shutdown() override;
@@ -1164,11 +1162,6 @@ void MumbleAudioEntity::Init()
 	MInit();
 }
 
-void MumbleAudioEntity::pad_8()
-{
-	int x = 0;
-}
-
 void MumbleAudioEntity::Shutdown()
 {
 	MShutdown();
@@ -1235,11 +1228,7 @@ void MumbleAudioEntity::MInit()
 	}
 
 	initValues.SetAllocationBucket(MAX_DEFAULT_ALLOCATION_BUCKETS + m_soundBucket);
-
-	// TODO: Investigate initValues likely broken offsets still
-	// If fixed persist call should go through.
-	//
-	//CreateSound_PersistentReference(0xD8CE9439, (rage::audSound**)&m_sound, initValues);
+		
 	CreateSound_PersistentReference(0x0F4A60A9, (rage::audSound**)&m_sound, initValues);
 
 	trace("created sound (%s): %016llx\n", ToNarrow(m_name), (uintptr_t)m_sound);
@@ -1306,7 +1295,7 @@ void MumbleAudioEntity::MShutdown()
 
 static hook::thiscall_stub<void(fwEntity*, rage::fwInteriorLocation&)> _entity_getInteriorLocation([]()
 {
-	return hook::get_pattern("4C 8B C1 75 2A 48 8B 89 ? ? ? ? 48 83 E1 FE", -0xA);
+	return hook::get_pattern("4C 8B C1 75 2A 48 8B 89 ? ? ? ? 48 83 E1 FE", -0x10);
 });
 
 static hook::thiscall_stub<void(fwEntity*, rage::fwInteriorLocation&)> _entity_getAudioInteriorLocation([]()
@@ -1762,7 +1751,7 @@ static HookFunction hookFunction([]()
 		updateVoiceMetricsStub.origCall = origUpdateVoiceMetrics;
 
 		auto temp = updateVoiceMetricsStub.GetCode();
-		hook::call(location, temp);
+		//hook::call(location, temp);
 	}
 
 	// intervene in audEnvironment::ComputeVoiceRoutes
@@ -1800,7 +1789,7 @@ static HookFunction hookFunction([]()
 		} computeVoiceRoutesStub;
 
 		auto location = hook::get_pattern("49 8B FE B3 7F 49 8B 07 48 8B"); // DONE		
-		hook::call(location, computeVoiceRoutesStub.GetCode());
+		//hook::call(location, computeVoiceRoutesStub.GetCode());
 	}
 
 	// make sure a value that's needed to remove submix flag is set
