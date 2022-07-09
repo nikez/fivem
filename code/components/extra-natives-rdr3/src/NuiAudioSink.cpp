@@ -41,7 +41,7 @@
 
 static concurrency::concurrent_queue<std::function<void()>> g_mainQueue;
 constexpr int MAX_NUM_SUBMIXES = 40;
-constexpr int MAX_DEFAULT_SUBMIXES = 13; //28;
+constexpr int MAX_DEFAULT_SUBMIXES = 14; //28;
 constexpr int MAX_DEFAULT_ALLOCATION_BUCKETS = 8;
 
 //#define _TODO_REMOVE_DISABLE_NATIVE_AUDIO
@@ -525,7 +525,9 @@ namespace rage
 	void audSoundInitParams::SetSubmixIndex(uint8_t submix)
 	{
 		// Previous value was 0x1C, which is 28, which coincides with the default # of submixes in V. 14 is default in R.
-		m_pad[311] = (submix - MAX_DEFAULT_SUBMIXES) | 0x20; // TODO:
+		//m_pad[311] = (submix - MAX_DEFAULT_SUBMIXES) | 0x20; // TODO:
+
+		*(uint16_t*)(&m_pad[0x134]) = (uint16_t)submix;
 		// this field does really weird stuff in game
 		//*(uint8_t*)(&m_pad[0x98]) = submix;
 		//*(uint16_t*)(&m_pad[0x9B]) = 3;
@@ -1726,18 +1728,17 @@ static HookFunction hookFunction([]()
 
 			virtual void InternalMain() override
 			{
-				test(byte_ptr[rdi + 586], 0x10);	// if ((rdi+560) & 0x10) {
+				test(byte_ptr[rdi + 587], 1);		// if ((rdi+560) & 0x10) {
 				jz("unsure");
 				L("sure");							// sure:
 				mov(eax, dword_ptr[rdi + 536]);		//    eax = (rdi + 536)
 				cmp(eax, MAX_DEFAULT_SUBMIXES);		// if (eax >= 0x1C) {
 				jl("go");
-				and(byte_ptr[rdi + 586], ~0x10);	//       (rdi + 586) &= ~0x10
-				or (byte_ptr[rdi + 587], 0x80);		//       (rdi + 587) |=  0x80
-				int3();
+				and(byte_ptr[rdi + 587], ~1);		//       (rdi + 586) &= ~0x10
+				or (byte_ptr[rdi + 585], 0x60);		//       (rdi + 587) |=  0x80				
 				jmp("go");							//    }
 				L("unsure");						// } else {
-				test(byte_ptr[rdi + 587], 0x80);	//    if ((rdi+248) & 0x80) {
+				test(byte_ptr[rdi + 585], 0x60);	//    if ((rdi+248) & 0x80) {
 				jnz("sure");						//        goto sure;
 													//    }
 				mov(eax, 0xFFFFFFFF);				//    eax = -1;
@@ -1751,7 +1752,7 @@ static HookFunction hookFunction([]()
 		updateVoiceMetricsStub.origCall = origUpdateVoiceMetrics;
 
 		auto temp = updateVoiceMetricsStub.GetCode();
-		//hook::call(location, temp);
+		hook::call(location, temp);
 	}
 
 	// intervene in audEnvironment::ComputeVoiceRoutes
@@ -1781,6 +1782,8 @@ static HookFunction hookFunction([]()
 			static void DoVoiceRoute(uint8_t* voiceData, int* outRoutes)
 			{
 				// TODO: If this is truly "our first submix", it should be > 14 not >= 14
+				// Current issue most likely because we don't mark the data as "dealth with" in the stub above. Probably why it is rendered normal without effects. Maybe try to locate actual flags we should use
+				// Also verify 3C as out route
 				if (voiceData[0x148] != 0xFF && voiceData[0x148] >= MAX_DEFAULT_SUBMIXES) // first route we have 'ourselves'
 				{
 					outRoutes[0] = voiceData[0x148];
@@ -1789,7 +1792,7 @@ static HookFunction hookFunction([]()
 		} computeVoiceRoutesStub;
 
 		auto location = hook::get_pattern("49 8B FE B3 7F 49 8B 07 48 8B"); // DONE		
-		//hook::call(location, computeVoiceRoutesStub.GetCode());
+		hook::call(location, computeVoiceRoutesStub.GetCode());
 	}
 
 	// make sure a value that's needed to remove submix flag is set
@@ -1845,7 +1848,8 @@ static InitFunction initFunction([]()
 			auto mixer = rage::audDriver::GetMixer();
 			if (auto submix = mixer->CreateSubmix(name.c_str(), 6, true); submix)
 			{
-				int idx = mixer->GetSubmixIndex(submix);
+				int idx = mixer->GetSubmixIndex(submix);				
+
 				submixesByName[hash] = idx;
 
 				mixer->FlagThreadCommandBufferReadyToProcess();
