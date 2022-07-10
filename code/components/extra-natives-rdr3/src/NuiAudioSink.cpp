@@ -1718,7 +1718,7 @@ static HookFunction hookFunction([]()
 
 	// add submix value to padding for rage::audEnvironment::UpdateVoiceMetrics
 	{
-		auto location = hook::get_pattern("E8 ? ? ? ? EB 2E 48 8B 8F ? ? ? ? E8");
+		auto location = hook::get_pattern("E8 ? ? ? ? 80 8F ? ? ? ? ? F3 0F 10 8D ? ? ? ?");
 		void* origUpdateVoiceMetrics;
 		hook::set_call(&origUpdateVoiceMetrics, location);
 
@@ -1728,6 +1728,7 @@ static HookFunction hookFunction([]()
 
 			virtual void InternalMain() override
 			{
+
 				test(byte_ptr[rdi + 587], 1);		// if ((rdi+560) & 0x10) {
 				jz("unsure");
 				L("sure");							// sure:
@@ -1735,10 +1736,10 @@ static HookFunction hookFunction([]()
 				cmp(eax, MAX_DEFAULT_SUBMIXES);		// if (eax >= 0x1C) {
 				jl("go");
 				and(byte_ptr[rdi + 587], ~1);		//       (rdi + 586) &= ~0x10
-				or (byte_ptr[rdi + 585], 0x60);		//       (rdi + 587) |=  0x80				
+				or (byte_ptr[rdi + 588], 0x80); //       (rdi + 587) |= 0x80
 				jmp("go");							//    }
 				L("unsure");						// } else {
-				test(byte_ptr[rdi + 585], 0x60);	//    if ((rdi+248) & 0x80) {
+				test(byte_ptr[rdi + 588], 0x80); //    if ((rdi+248) & 0x80) {
 				jnz("sure");						//        goto sure;
 													//    }
 				mov(eax, 0xFFFFFFFF);				//    eax = -1;
@@ -1765,7 +1766,7 @@ static HookFunction hookFunction([]()
 				sub(rsp, 0x28);
 
 				mov(rcx, qword_ptr[r15]);
-				lea(rdx, qword_ptr[rsp + 0x3C/*0x178*/]);
+				lea(rdx, qword_ptr[rsp + 0x30 + 0xB0/*0x178*/]);
 
 				mov(rax, (uint64_t)DoVoiceRoute);
 				call(rax);
