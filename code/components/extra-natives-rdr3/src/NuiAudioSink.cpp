@@ -1693,11 +1693,104 @@ static bool audConfig_GetData_uint(const char* param, uint32_t& out)
 	return g_orig_audConfig_GetData_uint(param, out);
 }
 
+class sub_1402D97A4_class2
+{
+public:
+	uint32_t hashes[24];//0x0000	
+	uint32_t count; //0x0060
+}; //Size: 0x0064
+static_assert(offsetof(sub_1402D97A4_class2, count) == 0x60, "sub_1402D97A4_class2 wrong size");
+
+class sub_1402D97A4_class3
+{
+public:
+	char pad_0000[96]; //0x0000
+}; //Size: 0x0060
+
+class sub_1402D97A4_class1
+{
+public:
+	class sub_1402D97A4_class2* class2; //0x0000
+	uint64_t count; //0x0008
+	sub_1402D97A4_class3 class3; //0x0010
+	uint32_t count2; //0x0070
+}; //Size: 0x0074
+
+static uint64_t (*g_orig_sub_1402D97A4)(sub_1402D97A4_class1* a1, uint64_t a2, uint32_t* hash);
+
+static uint64_t sub_1402D97A4(sub_1402D97A4_class1* a1, uint64_t a2, uint32_t* hash)
+{	
+	uint64_t result = g_orig_sub_1402D97A4(a1, a2, hash);
+
+
+	return result;
+}
+
+std::unordered_map<uint32_t, uint32_t> g_category_setting_mapping;
+
+static uint64_t (*g_orig_sub_142CAB3BC)(sub_1402D97A4_class1* a1, sub_1402D97A4_class1* a2);
+
+static uint64_t sub_142CAB3BC(sub_1402D97A4_class1* a1, sub_1402D97A4_class1* a2)
+{
+	uint64_t result = g_orig_sub_142CAB3BC(a1, a2);
+
+	if (a2 && a2->count && a2->class2 && a2->class2->count)
+	{
+		uint32_t hash = a2->class2->hashes[a2->class2->count];
+
+		g_category_setting_mapping.insert(std::pair<uint32_t, uint32_t>(hash, 0));
+	}
+	return result;
+}
+
+std::unordered_map<uint32_t, uint64_t> g_settings;
+
+static bool (*g_orig_sub_1401F2218)(uint64_t a1, uint64_t a2, uint32_t* a3, uint32_t a4, char a5);
+
+static bool sub_1401F2218(uint64_t a1, uint64_t a2, uint32_t* a3, uint32_t a4, char a5)
+{
+	bool result = g_orig_sub_1401F2218(a1, a2, a3, a4, a5);
+
+	if (a3)
+	{
+		g_settings.insert({ *a3, a4 });
+	}
+	/*if (a3)
+	{
+		auto entry = g_category_setting_mapping.find(*a3);
+		if (entry != g_category_setting_mapping.end())
+		{
+			entry->second =
+		}
+	}*/
+	
+
+	return result;
+}
+
+
 static HookFunction hookFunction([]()
 {
 	#ifdef _TODO_REMOVE_DISABLE_NATIVE_AUDIO
 	return;
 	#endif
+
+	{
+		auto location = (void*)0x1402D97A4;
+		
+		MH_Initialize();
+		MH_CreateHook(location, sub_1402D97A4, (void**)&g_orig_sub_1402D97A4);
+		MH_EnableHook(location);
+
+		location = (void*)0x142CAB3BC;
+		MH_CreateHook(location, sub_142CAB3BC, (void**)&g_orig_sub_142CAB3BC);
+		MH_EnableHook(location);
+
+		location = (void*)0x1401F2218;
+		MH_CreateHook(location, sub_1401F2218, (void**)&g_orig_sub_1401F2218);
+		MH_EnableHook(location);
+	}
+
 
 	//g_preferenceArray = hook::get_address<uint32_t*>(hook::get_pattern("48 8D 15 ? ? ? ? 8D 43 01 83 F8 02 77 2D")); // NOT NEEDED
 
@@ -1823,6 +1916,58 @@ static HookFunction hookFunction([]()
 		MH_EnableHook(location);
 	}
 });
+
+static const auto new_pack_file = reinterpret_cast<void* (*)(const char*, bool, std::int32_t, std::uint64_t, std::uint64_t, std::uint32_t)>(0x1425EE488);
+static const auto pack_file_mount = reinterpret_cast<bool (*)(void*, const char*)>(0x1425EDFB4);
+
+static const auto g_file_mounters = reinterpret_cast<void**>(0x144A94710);
+static const auto g_data_file_types = reinterpret_cast<std::array<std::uint64_t, 2>*>(0x143AC2F90);
+
+std::uint32_t get_mounter_index(const std::uint32_t name_hash)
+{
+
+	auto it = g_data_file_types;
+
+	while (true)
+	{
+
+		const auto [hash, index] = *it;
+
+		if (hash == 0x0 || index == 0xFFFFFFFFFFFFFFFF)
+			break;
+
+		if (hash == name_hash)
+			return index;
+
+		it++;
+	}
+
+	return -1;
+}
+
+template<std::size_t Index, typename ReturnType, typename... Args>
+inline ReturnType call_virtual(void* instance, Args... args)
+{
+	using Fn = ReturnType(__thiscall*)(void*, Args...);
+
+	auto function = (*reinterpret_cast<Fn**>(instance))[Index];
+	return function(instance, args...);
+}
+
+void mount_data_file(const std::string_view data_file_type, const std::string_view file_path)
+{
+
+	const auto mounter_index = get_mounter_index(HashRageString(data_file_type.data()));
+
+	if (mounter_index == -1)
+		return;
+
+	// Clueless :thumbsup:
+	auto data = std::array<std::uint8_t, 0xFF>{};
+	std::copy(file_path.begin(), file_path.end(), data.begin());
+
+	call_virtual<1, bool>(g_file_mounters[mounter_index], data.data());
+}
 
 rage::audDspEffect* MakeRadioFX();
 
@@ -1982,21 +2127,28 @@ static InitFunction initFunction([]()
 	{
 		if (type == rage::InitFunctionType::INIT_CORE && data.funcHash == /*0xE6D408DF*/ 0x602ee6e2)
 		{
-			//std::string packFile;
-			//std::string soundData;
-			//std::string wavePack;
-			//packFile = "dlcpacks:/mp001/dlc.rpf";
-			//soundData = "x64/audio/dlcmp001_sounds.dat";
-			//wavePack = "x64/audio/dlc_mp001";
-			//rage::fiPackfile* dlcAud = new rage::fiPackfile();
-			//if (dlcAud->OpenPackfile(packFile.c_str(), true, 3, false))
-			//{
-			//	dlcAud->Mount("menuAud:/");
+			std::string packFile;
+			std::string soundData;
+			std::string wavePack;
+			packFile = "dlcpacks:/mp001/dlc.rpf";
+			soundData = "x64/audio/dlcmp001_sounds.dat";
+			wavePack = "x64/audio/dlc_mp001";
+			/*rage::fiPackfile* dlcAud = new rage::fiPackfile();
+			if (dlcAud->OpenPackfile(packFile.c_str(), true, 3, false))
+			{
+				dlcAud->Mount("menuAud:/");
 
-			//	ForceMountDataFile({ "AUDIO_SOUNDDATA", fmt::sprintf("menuAud:/%s", soundData) });
-			//	ForceMountDataFile({ "AUDIO_WAVEPACK", fmt::sprintf("menuaud:/%s", wavePack) });
+				ForceMountDataFile({ "AUDIO_SOUNDDATA", fmt::sprintf("menuAud:/%s", soundData) });
+				ForceMountDataFile({ "AUDIO_WAVEPACK", fmt::sprintf("menuaud:/%s", wavePack) });
 
-			//}
+			}*/
+
+			const auto pack_file = new_pack_file(packFile.c_str(), true, 3, 0, 0, 0xFFFFFFFF);
+			pack_file_mount(pack_file, "menuAud:/");
+
+			mount_data_file("AUDIO_SOUNDDATA", fmt::sprintf("menuAud:/%s", soundData));
+			mount_data_file("AUDIO_WAVEPACK", fmt::sprintf("menuaud:/%s", wavePack));
+
 			audioRunning = true;
 		}
 	});
