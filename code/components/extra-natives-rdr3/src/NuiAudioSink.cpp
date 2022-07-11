@@ -70,6 +70,7 @@ namespace rage
 	{
 	public:
 		static audWaveSlot* FindWaveSlot(uint32_t hash);
+		void RequestLoad();
 	};
 
 	class audChannelVoiceVolumes
@@ -864,7 +865,7 @@ namespace rage
 
 	static HookFunction hookFunction([]()
 	{
-		g_frontendAudioEntity = hook::get_address<audEntity*>(hook::get_pattern("48 8D 0D ? ? ? ? BA ? ? ? ? 74 05 BA ? ? ? ? "), 3, 7); // DONE
+		//g_frontendAudioEntity = hook::get_address<audEntity*>(hook::get_pattern("48 8D 0D ? ? ? ? BA ? ? ? ? 74 05 BA ? ? ? ?"), 3, 7); // DONE
 
 		g_categoryMgr = hook::get_address<audCategoryManager*>(hook::get_pattern("48 8D 0D ? ? ? ? E8 ? ? ? ? BE ? ? ? ? 48 8D 0D ? ? ? ? 8B D6"), 3, 7); // DONE
 
@@ -878,9 +879,19 @@ namespace rage
 		return hook::get_call(hook::get_pattern("E8 ? ? ? ? 41 8D 4F 68")); // DONE
 	});
 
+	static hook::thiscall_stub<void(audWaveSlot*)> _requestLoad([]()
+	{
+		return (void*)0x142590768; // DONE
+	});
+
 	audWaveSlot* audWaveSlot::FindWaveSlot(uint32_t hash)
 	{
 		return _findWaveSlot(hash);
+	}
+
+	void audWaveSlot::RequestLoad()
+	{
+		return _requestLoad(this);
 	}
 
 	static hook::cdecl_stub<float(float)> _linearToDb([]()
@@ -1775,21 +1786,21 @@ static HookFunction hookFunction([]()
 	return;
 	#endif
 
-	{
-		auto location = (void*)0x1402D97A4;
-		
-		MH_Initialize();
-		MH_CreateHook(location, sub_1402D97A4, (void**)&g_orig_sub_1402D97A4);
-		MH_EnableHook(location);
+	//{
+	//	auto location = (void*)0x1402D97A4;
+	//	
+	//	MH_Initialize();
+	//	MH_CreateHook(location, sub_1402D97A4, (void**)&g_orig_sub_1402D97A4);
+	//	MH_EnableHook(location);
 
-		location = (void*)0x142CAB3BC;
-		MH_CreateHook(location, sub_142CAB3BC, (void**)&g_orig_sub_142CAB3BC);
-		MH_EnableHook(location);
+	//	location = (void*)0x142CAB3BC;
+	//	MH_CreateHook(location, sub_142CAB3BC, (void**)&g_orig_sub_142CAB3BC);
+	//	MH_EnableHook(location);
 
-		location = (void*)0x1401F2218;
-		MH_CreateHook(location, sub_1401F2218, (void**)&g_orig_sub_1401F2218);
-		MH_EnableHook(location);
-	}
+	//	location = (void*)0x1401F2218;
+	//	MH_CreateHook(location, sub_1401F2218, (void**)&g_orig_sub_1401F2218);
+	//	MH_EnableHook(location);
+	//}
 
 
 	//g_preferenceArray = hook::get_address<uint32_t*>(hook::get_pattern("48 8D 15 ? ? ? ? 8D 43 01 83 F8 02 77 2D")); // NOT NEEDED
@@ -2167,16 +2178,17 @@ static InitFunction initFunction([]()
 		static ConVar<std::string> musicThemeVariable("ui_selectMusic", ConVar_Archive, "MP_ADV_INTRO_OS6");
 		static std::string lastSong = musicThemeVariable.GetValue();
 
-		//static rage::audSound* g_sound;
-		//static bool swapSong;
-		//static bool wasLoading;
+		static rage::audSound* g_sound;
+		static bool swapSong;
+		static bool wasLoading;
 
 		if (audioRunning)
 		{
-			bool active = nui::HasMainUI() && (!netLibrary || netLibrary->GetConnectionState() == NetLibrary::CS_IDLE) && !arenaWarVariable.GetValue();
+			bool active = true;
+			 //nui::HasMainUI() && (!netLibrary || netLibrary->GetConnectionState() == NetLibrary::CS_IDLE) && !arenaWarVariable.GetValue();
 			bool viaLoading = false;
 
-			/*if (launch::IsSDKGuest())
+			if (launch::IsSDKGuest())
 			{
 				active = false;
 			}
@@ -2207,43 +2219,51 @@ static InitFunction initFunction([]()
 				{
 					active = false;
 				}
-			}*/
+			}
 
 
-			//if (active && !g_sound)
-			//{
-			//	rage::audSoundInitParams initValues;
+			if (active && !g_sound)
+			{
+				rage::audSoundInitParams initValues;
 
-			//	//float volume = rage::GetDbForLinear(std::min(std::min({ g_preferenceArray[PREF_MUSIC_VOLUME], g_preferenceArray[PREF_MUSIC_VOLUME_IN_MP], g_preferenceArray[PREF_SFX_VOLUME] }) / 10.0f, 0.75f
-			//	initValues.SetVolume(10.0f);
+				//float volume = rage::GetDbForLinear(std::min(std::min({ g_preferenceArray[PREF_MUSIC_VOLUME], g_preferenceArray[PREF_MUSIC_VOLUME_IN_MP], g_preferenceArray[PREF_SFX_VOLUME] }) / 10.0f, 0.75f
+				initValues.SetVolume(10.0f);
 
-			//	auto musicTheme = musicThemeVariable.GetValue();
+				auto musicTheme = musicThemeVariable.GetValue();
 
-			//	rage::g_frontendAudioEntity->CreateSound_PersistentReference(viaLoading ? 0x8D8B11E3 : HashString(musicTheme.c_str()), (rage::audSound**)&g_sound, initValues);
+				if (!rage::g_frontendAudioEntity)
+				{
+					rage::g_frontendAudioEntity = new rage::audEntity();
+					rage::g_frontendAudioEntity->Init();
+				}
 
-			//	if (g_sound)
-			//	{
-			//		g_sound->PrepareAndPlay(rage::audWaveSlot::FindWaveSlot(0x19BB7941), true, -1, false);
-			//		_updateAudioThread(1);
-			//	}
-			//	else
-			//	{
-			//		musicThemeVariable.GetHelper()->SetValue("dlc_awxm2018_theme_5_stems");
-			//	}
-			//}
-			//else if ((g_sound && (!active || swapSong)) || musicThemeVariable.GetValue() != lastSong)
-			//{
-			//	if (g_sound)
-			//	{
-			//		g_sound->StopAndForget(false);
-			//		g_sound = nullptr;
+				rage::g_frontendAudioEntity->CreateSound_PersistentReference(0x0F4A60A9, (rage::audSound**)&g_sound, initValues);
 
-			//		_updateAudioThread(0);
-			//	}
+				if (g_sound)
+				{
+					auto y = rage::audWaveSlot::FindWaveSlot(0xF2047EF5);
+					y->RequestLoad();
+					g_sound->PrepareAndPlay(y, true, -1, false);
+					_updateAudioThread(0);
+				}
+				else
+				{
+					musicThemeVariable.GetHelper()->SetValue("MP_ADV_INTRO_OS6");
+				}
+			}
+			else if ((g_sound && (!active || swapSong)) || musicThemeVariable.GetValue() != lastSong)
+			{
+				if (g_sound)
+				{
+					g_sound->StopAndForget(false);
+					g_sound = nullptr;
 
-			//	lastSong = musicThemeVariable.GetValue();
-			//	swapSong = false;
-			//}
+					_updateAudioThread(0);
+				}
+
+				lastSong = musicThemeVariable.GetValue();
+				swapSong = false;
+			}
 		}
 	});
 
@@ -2271,8 +2291,8 @@ static InitFunction initFunction([]()
 
 		if (controller)
 		{
-			*(float*)(&controller[0]) = volume * 2.0f;
-			*(float*)(&controller[4]) = 0.0f;
+			//*(float*)(&controller[0]) = volume * 2.0f;
+			//*(float*)(&controller[4]) = 0.0f;
 		}
 	});
 });

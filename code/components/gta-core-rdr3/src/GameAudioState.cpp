@@ -15,7 +15,8 @@ static int* muteOnFocusLoss;
 
 bool DLL_EXPORT ShouldMuteGameAudio()
 {
-	return *audioNotFocused && *muteOnFocusLoss;
+	return false;
+	//return *audioNotFocused && *muteOnFocusLoss;
 }
 
 namespace rage
