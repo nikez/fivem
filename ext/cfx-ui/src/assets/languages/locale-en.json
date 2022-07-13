@@ -55,6 +55,8 @@
     "#Settings_BoostLoading": "Loading...",
     "#Settings_BoostNone": "None! BOOST™ a server by clicking the upvote button in the server list.",
     "#Settings_Language": "Language",
+    "#Settings_MuteOnFocusLoss": "Mute on focus loss",
+    "#Settings_MuteOnFocusLossDesc": "Disables cfx inflicted audio if the game window is not focussed. Does not affect game audio",
     "#Settings_MenuAudio": "Main menu audio",
     "#Settings_MenuAudioDesc": "Enable background music while idle in the main menu",
     "#Settings_GameStreamProgress": "Streaming progress",

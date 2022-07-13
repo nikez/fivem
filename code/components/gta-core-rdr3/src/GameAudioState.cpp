@@ -1,35 +1,47 @@
 #include <StdInc.h>
 #include <Hooking.h>
-
 #include <CoreConsole.h>
 #include <nutsnbolts.h>
-
-#include <CrossBuildRuntime.h>
-
 #include <MinHook.h>
 
-//#define _TODO_REMOVE_DISABLE_NATIVE_AUDIO
+#define BYTEn(x, n) (*((unsigned char*)&(x) + n))
+#define BYTE2(x) BYTEn(x, 2)
 
-static bool* audioNotFocused;
-static int* muteOnFocusLoss; 
+static bool* g_windowInFocus;
+static bool g_muteOnFocusLoss = false;
 
+/**
+* Callback to determine if cfx inflicted audio should be muted
+*
+* @return If the window is out of focus and the user activated the settings option
+*/
 bool DLL_EXPORT ShouldMuteGameAudio()
 {
-	return false;
-	//return *audioNotFocused && *muteOnFocusLoss;
+	return !(*g_windowInFocus) && g_muteOnFocusLoss;
 }
 
 namespace rage
 {
+	// Used in rage::audEngine::AudioFrame
+	//
 	bool* g_audUseFrameLimiter;
 
+	/**
+	* Pseudo struct used inside rage::audMixerDevice::GeneratePcm
+	*
+	*/
 	struct wavePlayerStruct
 	{
-		int wavePlayerIndex;
-		int wavePlayerState;
-		int wavePlayerAreStatesEqual; // +0x1A == +0x1C
-	}; // size = 12 bytes
+		int32_t wavePlayerIndex;
+		int32_t wavePlayerState;
+		int32_t wavePlayerAreStatesEqual;
+	};
 
+	/**
+	* Rebuild of rage::audWavePlayer
+	*
+	* Offsets and vft indices can be obtained from rage::audMixerDevice::GeneratePcm
+	*/
 	struct audWavePlayer
 	{
 		virtual void GenerateFrame(void) = 0;
@@ -40,59 +52,96 @@ namespace rage
 		virtual void StopPhys() = 0;
 		virtual void StartFrame() = 0;
 		virtual void EndFrame() = 0;
-		virtual void SetParam() = 0;
-		virtual void SetParam_() = 0;
+		virtual void SetParam(uint32_t, float) = 0;
+		virtual void SetParam(uint32_t, uint32_t) = 0;
 		virtual void HandleCustomCommandPacket() = 0;
 		virtual void GetHeadroom() = 0;
 		virtual void GetLengthSamples() = 0;
 		virtual bool IsLooping(void) = 0;
-		virtual unsigned int GetPlayPositionSamples(void) = 0;
+		virtual uint32_t GetPlayPositionSamples(void) = 0;
 		virtual bool IsFinished(void) = 0;
 		virtual bool HasStartedPlayback(void) = 0;
 		virtual int64_t ProcessSyncSignal(void* syncSignal) = 0;
 		virtual void Shutdown() = 0;
 		virtual uint16_t GetCurrentPeakLevel() = 0;
-		virtual void DESTROY() = 0;
+		virtual void Destructor() = 0;
 		virtual uint16_t GetNumberOfChannels() = 0;
 		virtual void SubmitDataToDecoder() = 0;
 
 	public:
 		uint16_t skip_frame;
-		char _padA[12];
+		char _padA[0xA];
 		uint16_t state;
-		char _pad16[8];
+		char _pad16[0x8];
 		uint8_t flag;
 	};
+	static_assert(offsetof(audWavePlayer, flag) == 0x1E, "audWavePlayer missaligned");
 
+	/**
+	* Rebuild of rage::audMixerDevice
+	*
+	* Offsets can be obtained from rage::audMixerDevice::GeneratePcm
+	*/
 	struct audMixerDevice
-	{		
-		inline int GetMaxWavePlayers()
+	{
+		/**
+		* Wrapper for rage::audWavePlayer::Shutdown and rage::audPcmSourceFactory::FreeSlot
+		*
+		* @return Number of available audWavePlayer objects
+		*/
+		inline int32_t GetMaxWavePlayers()
 		{
-			return *(int*)(((uintptr_t)this) + 0x1E8B8);
+			return *reinterpret_cast<int32_t*>(reinterpret_cast<uintptr_t>(this) + 0x1E8B8);
 		}
 
-		inline int GetWavePlayerSize()
+		/**
+		* Retrieve the size of one rage::audWavePlayer object
+		*
+		* @return Size of an rage::audWavePlayer object
+		*/
+		inline int32_t GetWavePlayerSize()
 		{
-			return *(int*)(((uintptr_t)this) + 0x1E8BC);
+			return *reinterpret_cast<int32_t*>(reinterpret_cast<uintptr_t>(this) + 0x1E8BC);
 		}
 
-		inline int* GetRefArray()
+		inline int32_t* GetRefArray()
 		{
-			return (int*)(((uintptr_t)this) + 0x1DCB0);
+			return reinterpret_cast<int32_t*>(reinterpret_cast<uintptr_t>(this) + 0x1DCB0);
 		}
 
-		inline audWavePlayer* GetWavePlayerByIndex(int index)
+		/**
+		* Retrieve a single rage::audWavePlayer object
+		*
+		* @param[in] index of the slot to retrieve
+		* @return A pointer to an rage::audWavePlayer object
+		*/
+		inline audWavePlayer* GetWavePlayerByIndex(size_t index)
 		{
-			uintptr_t wavePlayerArrayStart = *(uintptr_t*)(((uintptr_t)this) + 0x1E8B0);
-			wavePlayerArrayStart += (index * GetWavePlayerSize());
-			return (audWavePlayer*)wavePlayerArrayStart;
+			uintptr_t wavePlayerArrayStart = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(this) + 0x1E8B0);
+			wavePlayerArrayStart += (index * this->GetWavePlayerSize());
+			return reinterpret_cast<audWavePlayer*>(wavePlayerArrayStart);
 		}
+
+		/**
+		* Wrapper for rage::audWavePlayer::Shutdown and rage::audPcmSourceFactory::FreeSlot
+		*
+		* @param[in] index of the slot to free
+		* @return unknown pointer
+		*/
+		void* FreePcmSourceSlot(int32_t index);
 	};
 
-	static hook::thiscall_stub<void*(rage::audMixerDevice*, int)> audMixerDevice__FreePcmSourceSlot([]()
+	// This is required for our rebuild as rage::audMixerDevice::GeneratePcm would normaly take care of it
+	//
+	static hook::thiscall_stub<void*(rage::audMixerDevice*, int32_t)> audMixerDevice__FreePcmSourceSlot([]()
 	{
 		return hook::get_pattern("8B DA 48 8B 89 ? ? ? ? 44 0F AF C2 49 03 C8", -0xC);
 	});
+
+	void* audMixerDevice::FreePcmSourceSlot(int32_t index)
+	{
+		return audMixerDevice__FreePcmSourceSlot(this, index);
+	}
 
 	namespace audDriver
 	{
@@ -100,96 +149,103 @@ namespace rage
 		inline char** sm_Mixer = 0;
 	}
 }
-#define BYTEn(x, n) (*((unsigned char*)&(x) + n))
-#define BYTE2(x) BYTEn(x, 2)
 
-static void rage__audMixerDevice__GeneratePcmV3(rage::audMixerDevice* thisptr)
+static void rage__audMixerDevice__GeneratePcm(rage::audMixerDevice* thisptr)
 {
-	int maxWavePlayers = thisptr->GetMaxWavePlayers();
-	int* refArray = thisptr->GetRefArray();
-	int numActivePlayers = 0;
-
-	// original size is 64, problem is that numActivePlayers can go up to the maxWavePlayers(0x300)
-	rage::wavePlayerStruct audMixerSyncSignalArray[0x301]{};
-
-	auto validBits = (int*)((uintptr_t)thisptr + 0x1D348);
-
-	for (size_t i = 0; i < maxWavePlayers; i++)
+	auto instance_update = [](rage::audWavePlayer* wavePlayer, size_t i) -> void
 	{
-		if (i >= thisptr->GetMaxWavePlayers())
+		struct _voice_instance
 		{
-			continue;
-		}
+		public:
+			uint8_t pad_0[4];
+			int32_t posSamples;
+			uint16_t peakLevel;
+			uint8_t pad_A[2];
+			int32_t flags;
+		} *instance = reinterpret_cast<_voice_instance*>(reinterpret_cast<char*>(rage::audDriver::m_VoiceManager) + (i * 16));
+		
+		instance->posSamples	= wavePlayer->IsFinished() ? -1 : wavePlayer->GetPlayPositionSamples();
+		instance->peakLevel		= wavePlayer->GetCurrentPeakLevel();
+		instance->flags			&= 0xFFF7FFFF;
+		instance->flags			|= (wavePlayer->HasStartedPlayback()) << 19;
+	};
 
+	// Increased from the original size 64 / 0x40 to the number of rage::audMixerDevice::GetMaxWavePlayers()
+	// 768 / 0x300 in rdr3. 
+	//
+	rage::wavePlayerStruct audMixerSyncSignalArray[0x301]{};
+	int32_t audMixerSyncSignalArraySize = 0;
+
+	int32_t* refArray	= thisptr->GetRefArray();
+	int32_t* validBits	= reinterpret_cast<int32_t*>(reinterpret_cast<uintptr_t>(thisptr) + 0x1D348);
+
+	// The first iterations fills our custom audMixerSyncSignalArray with valid entries
+	//
+	for (size_t i = 0; i < thisptr->GetMaxWavePlayers(); i++)
+	{
 		int thisBit = validBits[i / 32];
 		if ((thisBit & (1 << (i % 32))) == 0)
 		{
 			continue;
 		}
 
+		if (!refArray[i])
+		{
+			// Internally this calls rage::audWavePlayer::Shutdown and then rage::audPcmSourceFactory::FreeSlot
+			// 
+			thisptr->FreePcmSourceSlot(static_cast<int32_t>(i));
+			continue;
+		}
+
 		if (refArray[i])
 		{
-			char* voiceInst = voiceInst = (char*)rage::audDriver::m_VoiceManager + (i * 16);
-
-			if (*(int*)(voiceInst + 4) == -1)
+			char* voiceInst = reinterpret_cast<char*>(rage::audDriver::m_VoiceManager) + (i * 16);
+			if (*reinterpret_cast<int32_t*>(voiceInst + 4) == -1)
 			{
 				continue;
 			}
 
-			rage::audWavePlayer* wavePlayer = thisptr->GetWavePlayerByIndex(int(i));
+			rage::audWavePlayer* wavePlayer = thisptr->GetWavePlayerByIndex(i);
 			uint16_t state = wavePlayer->state;
 			if (state != 0xFFFF)
 			{
 				bool areStatesEqual = (state == wavePlayer->flag);
-				audMixerSyncSignalArray[numActivePlayers].wavePlayerState = (int)state;
-				audMixerSyncSignalArray[numActivePlayers].wavePlayerIndex = int(i);
-				audMixerSyncSignalArray[numActivePlayers].wavePlayerAreStatesEqual = (int)areStatesEqual;
+				audMixerSyncSignalArray[audMixerSyncSignalArraySize].wavePlayerState = static_cast<int32_t>(state);
+				audMixerSyncSignalArray[audMixerSyncSignalArraySize].wavePlayerIndex = static_cast<int32_t>(i);
+				audMixerSyncSignalArray[audMixerSyncSignalArraySize].wavePlayerAreStatesEqual = static_cast<int32_t>(areStatesEqual);
 
-				++numActivePlayers;
+				++audMixerSyncSignalArraySize;
 
 				if (!areStatesEqual)
 				{
 					continue;
 				}
 			}
-						
-			if (wavePlayer->skip_frame != 0xFFFF && *(uint64_t*)wavePlayer == 0x14365E560)
-			{
-				int x = 0;
-			}
 
 			if (wavePlayer->skip_frame == 0xFFFF)
 			{
 				wavePlayer->SkipFrame();
 			}
-			else			
+			else
 			{
+				// We intercept this call later in NuiAduioSink.cpp by hooking GenerateFrame to poll mumble
+				//
 				wavePlayer->GenerateFrame();
 			}
 
-			if (wavePlayer->IsFinished())
-			{
-				*(int*)(voiceInst + 4) = -1;
-			}
-			else
-			{
-				*(int*)(voiceInst + 4) = wavePlayer->GetPlayPositionSamples();
-			}
-			
-			*(uint16_t*)(voiceInst + 8) = wavePlayer->GetCurrentPeakLevel();
-			*(int*)(voiceInst + 12) &= 0xFFF7FFFF; // clear hasStarted flag
-			*(int*)(voiceInst + 12) |= (wavePlayer->HasStartedPlayback()) << 19;
-		}
-		else
-		{
-			rage::audMixerDevice__FreePcmSourceSlot(thisptr, int(i));
+			instance_update(wavePlayer, i);
 		}
 	}
 
-	for (int arrIndex = 0; arrIndex < numActivePlayers; arrIndex++)
+	// The second iteration 
+	//
+	for (int arrIndex = 0; arrIndex < audMixerSyncSignalArraySize; arrIndex++)
 	{
-		rage::audWavePlayer* wavePlayer = thisptr->GetWavePlayerByIndex(audMixerSyncSignalArray[arrIndex].wavePlayerIndex);
-		int v18 = *(int*)(*rage::audDriver::sm_Mixer + 4 * audMixerSyncSignalArray[arrIndex].wavePlayerState + 0x1FB3C);
+		int32_t i = audMixerSyncSignalArray[arrIndex].wavePlayerIndex;
+
+		rage::audWavePlayer* wavePlayer = thisptr->GetWavePlayerByIndex(i);
+
+		int32_t v18 = *(int32_t*)(*rage::audDriver::sm_Mixer + 4 * audMixerSyncSignalArray[arrIndex].wavePlayerState + 0x1FB3C);
 		if ((BYTE2(v18) || HIBYTE(v18)) && wavePlayer->ProcessSyncSignal(&v18) || !audMixerSyncSignalArray[arrIndex].wavePlayerAreStatesEqual)
 		{
 			if (wavePlayer->skip_frame == 0xFFFF)
@@ -198,29 +254,14 @@ static void rage__audMixerDevice__GeneratePcmV3(rage::audMixerDevice* thisptr)
 			}
 			else
 			{
+				// We intercept this call later in NuiAduioSink.cpp by hooking GenerateFrame to poll mumble
+				//
 				wavePlayer->GenerateFrame();
 			}
-			if (audMixerSyncSignalArray[arrIndex].wavePlayerIndex != -1)
+
+			if (i != -1)
 			{
-				auto i = audMixerSyncSignalArray[arrIndex].wavePlayerIndex;
-				char* voiceInst = voiceInst = (char*)rage::audDriver::m_VoiceManager + (i * 16);
-				// this chunk is not inlined on 2189+, function name is unknown however
-				{
-					if (wavePlayer->IsFinished())
-					{
-						*(int*)(voiceInst + 4) = -1;
-					}
-					else
-					{
-						*(int*)(voiceInst + 4) = wavePlayer->GetPlayPositionSamples();
-					}
-					
-					{
-						*(uint16_t*)(voiceInst + 8) = wavePlayer->GetCurrentPeakLevel();
-						*(int*)(voiceInst + 12) &= 0xFFF7FFFF;
-						*(int*)(voiceInst + 12) |= (wavePlayer->HasStartedPlayback()) << 19;
-					}
-				}
+				instance_update(wavePlayer, i);
 			}
 		}
 	}
@@ -229,41 +270,76 @@ static void rage__audMixerDevice__GeneratePcmV3(rage::audMixerDevice* thisptr)
 static HookFunction hookFunction([]()
 {
 	{
-		//auto location = hook::get_pattern<char>("75 17 40 38 2D ? ? ? ? 74 0E 39 2D", 5);
-		audioNotFocused = (bool*)malloc(1); 
-		//*audioNotFocused = false;			// hook::get_address<bool*>(location);
-		muteOnFocusLoss = (int*)malloc(4);	
-		//*muteOnFocusLoss = 0;				// hook::get_address<int*>(location + 8);
+		// This feature was present in FiveM based on a native game feature. As rdr3 doesn't have something like that we replace it with our own settings option
+		// 
+		// How to locate: Updated inside the games windowproc if WM_KILLFOCUS / WM_SETFOCUS is triggered
+		//
+		g_windowInFocus = hook::get_address<bool*>(hook::get_pattern<char>("80 3D ? ? ? ? ? 74 04 B3 01 EB 08"), 2, 7);
 	}
 	
 	{
+		// Fixes hitches in certain situations. The exposed convar directly updates the game variable
+		// 
+		// How to locate: A reference to the variable can be found inside rage::audEngine::AudioFrame
+		//
 		auto location = hook::get_pattern("80 3D ? ? ? ? ? 74 6F 48 8D");
-		rage::g_audUseFrameLimiter = hook::get_address<bool*>(location, 2, 7);		
-	}
-
-	#ifdef _TODO_REMOVE_DISABLE_NATIVE_AUDIO
-	return;
-	#endif
-
-	{
-		// Re-Build rage::audMixerDevice::GeneratePcm() because the stack-buffer for audMixerSyncSignalArray is too small
-		auto funcStart = hook::get_pattern("E8 ? ? ? ? 48 8D 4C 24 ? E8 ? ? ? ? 45 8B 87 ? ? ? ? 48", -0x2E);
-
-		MH_CreateHook(funcStart, rage__audMixerDevice__GeneratePcmV3, nullptr);
-		MH_EnableHook(funcStart);
-
-		auto line = hook::get_pattern("48 8D 15 ? ? ? ? 33 F6 89 BD ? ? ? ? 45 85 C0");
-		rage::audDriver::m_VoiceManager = hook::get_address<int64_t*>(line, 3, 7);
-		auto line2 = hook::get_pattern("48 8B 0D ? ? ? ? 48 85 C9 40 0F 95 C7 48 85 C9 74 66"); // DONE
-		rage::audDriver::sm_Mixer = hook::get_address<char**>(line2, 3, 7);
+		rage::g_audUseFrameLimiter = hook::get_address<bool*>(location, 2, 7);
 	}
 
 	{
-		static bool useSynchronousAudio = false;
+		// Re-Build rage::audMixerDevice::GeneratePcm because the stack-buffer for audMixerSyncSignalArray is too small
+		// rage::audMixerDevice::GeneratePcm does not have enough stack-space to support a audMixerSyncSignalArray with sufficient size
+		// This rebuild should be 1:1 from the game code only increasing the array size
+		// 
+		// How to locate: Called by rage::audMixerDevice::MixBuffersInternal after rage::audMixerDevice::ComputeProcessingGraph
+		//
+		auto location = hook::get_pattern("E8 ? ? ? ? 48 8D 4C 24 ? E8 ? ? ? ? 45 8B 87 ? ? ? ? 48", -0x2E);
+		if (!location)
+		{
+			console::DPrintf("GameAudioState", "Failed to locate rage::audMixerDevice::GeneratePcm\n");
+			__debugbreak();
+		}
+
+		#pragma warning(suppress : 26812)
+		MH_Initialize();
+
+		auto status = MH_CreateHook(location, rage__audMixerDevice__GeneratePcm, nullptr);
+		if (status != MH_OK || MH_EnableHook(location))
+		{
+			console::DPrintf("GameAudioState", "Failed to hook rage::audMixerDevice::GeneratePcm\n");
+			__debugbreak();
+		}
+
+		// Get rage::audDriver::m_VoiceManager and rage::audDriver::sm_Mixer
+		//
+		// How to locate: Both can be found inside rage::audMixerDevice::GeneratePcm
+		//
+		auto location_voiceManager	= hook::get_pattern("48 8D 15 ? ? ? ? 33 F6 89 BD ? ? ? ? 45 85 C0");
+		auto location_smMixer		= hook::get_pattern("48 8B 0D ? ? ? ? 48 85 C9 40 0F 95 C7 48 85 C9 74 66");
+		if (!location_voiceManager || !location_smMixer)
+		{
+			console::DPrintf("GameAudioState", "Failed to locate rage::audDriver::m_VoiceManager or rage::audDriver::sm_Mixer\n");
+			__debugbreak();
+		}
+
+		rage::audDriver::m_VoiceManager = hook::get_address<int64_t*>(location_voiceManager, 3, 7);
+		rage::audDriver::sm_Mixer		= hook::get_address<char**>(location_smMixer, 3, 7);
+	}
+
+	// In FiveM there is a "temporary fix" here for rockstar editor crashes.
+	// I assume this is currently not needed as redm doesn't have an editor?
+	//
+	{
+		static bool useSynchronousAudio		= false;
 		static bool lastUseSynchronousAudio = false;
 
-		static auto asynchronousAudio = hook::get_address<bool*>(hook::get_pattern("80 3D ? ? ? ? ? 74 38 33 DB 40 84 FF 74 19")); // DONE
-		static auto audioTimeout = hook::get_address<int*>(hook::get_pattern("8B 15 ? ? ? ? 41 03 D6 3B", 2)); // DONE
+		static auto asynchronousAudio	= hook::get_address<bool*>(hook::get_pattern("80 3D ? ? ? ? ? 74 38 33 DB 40 84 FF 74 19"));
+		static auto audioTimeout		= hook::get_address<int*>(hook::get_pattern("8B 15 ? ? ? ? 41 03 D6 3B", 2));
+		if (!asynchronousAudio || !audioTimeout)
+		{
+			console::DPrintf("GameAudioState", "Failed to locate asynchronousAudio or audioTimeout\n");
+			__debugbreak();
+		}
 
 		OnGameFrame.Connect([]()
 		{
@@ -288,4 +364,5 @@ static HookFunction hookFunction([]()
 	}
 
 	static ConVar<bool> audUseFrameLimiter("game_useAudioFrameLimiter", ConVar_Archive, true, rage::g_audUseFrameLimiter);
+	static ConVar<bool> uiMuteOnFocusLoss("ui_muteOnFocusLoss", ConVar_Archive, g_muteOnFocusLoss, &g_muteOnFocusLoss);
 });

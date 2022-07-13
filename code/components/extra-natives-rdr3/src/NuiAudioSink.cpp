@@ -2184,8 +2184,7 @@ static InitFunction initFunction([]()
 
 		if (audioRunning)
 		{
-			bool active = true;
-			 //nui::HasMainUI() && (!netLibrary || netLibrary->GetConnectionState() == NetLibrary::CS_IDLE) && !arenaWarVariable.GetValue();
+			bool active = nui::HasMainUI() && (!netLibrary || netLibrary->GetConnectionState() == NetLibrary::CS_IDLE) && !arenaWarVariable.GetValue();
 			bool viaLoading = false;
 
 			if (launch::IsSDKGuest())
@@ -2241,9 +2240,9 @@ static InitFunction initFunction([]()
 
 				if (g_sound)
 				{
-					auto y = rage::audWaveSlot::FindWaveSlot(0xF2047EF5);
-					y->RequestLoad();
-					g_sound->PrepareAndPlay(y, true, -1, false);
+					//auto y = rage::audWaveSlot::FindWaveSlot(0xF2047EF5);
+					//y->RequestLoad();
+					//g_sound->PrepareAndPlay(y, true, -1, false);
 					_updateAudioThread(0);
 				}
 				else
@@ -2291,8 +2290,8 @@ static InitFunction initFunction([]()
 
 		if (controller)
 		{
-			//*(float*)(&controller[0]) = volume * 2.0f;
-			//*(float*)(&controller[4]) = 0.0f;
+			*(float*)(&controller[0x8]) = volume * 2.0f;
+			*(float*)(&controller[0xC]) = 0.0f;
 		}
 	});
 });
