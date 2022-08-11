@@ -1,4 +1,5 @@
 #include <StdInc.h>
+#include <GameAudioState.h>
 #include <Hooking.h>
 #include <CoreConsole.h>
 #include <nutsnbolts.h>
@@ -18,6 +19,19 @@ static bool g_muteOnFocusLoss = false;
 bool DLL_EXPORT ShouldMuteGameAudio()
 {
 	return !(*g_windowInFocus) && g_muteOnFocusLoss;
+}
+
+namespace stubs
+{
+	// rage::audMixerDevice
+	//
+	namespace _audMixerDevice
+	{
+		static hook::thiscall_stub<void*(rage::audMixerDevice*, int32_t)> FreePcmSource([]()
+		{
+			return hook::get_pattern("8B DA 48 8B 89 ? ? ? ? 44 0F AF C2 49 03 C8", -0xC);
+		});
+	}
 }
 
 namespace rage
@@ -78,70 +92,55 @@ namespace rage
 	static_assert(offsetof(audWavePlayer, flag) == 0x1E, "audWavePlayer missaligned");
 
 	/**
-	* Rebuild of rage::audMixerDevice
+	* Wrapper for rage::audWavePlayer::Shutdown and rage::audPcmSourceFactory::FreeSlot
 	*
-	* Offsets can be obtained from rage::audMixerDevice::GeneratePcm
+	* @return Number of available audWavePlayer objects
 	*/
-	struct audMixerDevice
+	int32_t audMixerDevice::GetMaxWavePlayers()
 	{
-		/**
-		* Wrapper for rage::audWavePlayer::Shutdown and rage::audPcmSourceFactory::FreeSlot
-		*
-		* @return Number of available audWavePlayer objects
-		*/
-		inline int32_t GetMaxWavePlayers()
-		{
-			return *reinterpret_cast<int32_t*>(reinterpret_cast<uintptr_t>(this) + 0x1E8B8);
-		}
-
-		/**
-		* Retrieve the size of one rage::audWavePlayer object
-		*
-		* @return Size of an rage::audWavePlayer object
-		*/
-		inline int32_t GetWavePlayerSize()
-		{
-			return *reinterpret_cast<int32_t*>(reinterpret_cast<uintptr_t>(this) + 0x1E8BC);
-		}
-
-		inline int32_t* GetRefArray()
-		{
-			return reinterpret_cast<int32_t*>(reinterpret_cast<uintptr_t>(this) + 0x1DCB0);
-		}
-
-		/**
-		* Retrieve a single rage::audWavePlayer object
-		*
-		* @param[in] index of the slot to retrieve
-		* @return A pointer to an rage::audWavePlayer object
-		*/
-		inline audWavePlayer* GetWavePlayerByIndex(size_t index)
-		{
-			uintptr_t wavePlayerArrayStart = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(this) + 0x1E8B0);
-			wavePlayerArrayStart += (index * this->GetWavePlayerSize());
-			return reinterpret_cast<audWavePlayer*>(wavePlayerArrayStart);
-		}
-
-		/**
-		* Wrapper for rage::audWavePlayer::Shutdown and rage::audPcmSourceFactory::FreeSlot
-		*
-		* @param[in] index of the slot to free
-		* @return unknown pointer
-		*/
-		void* FreePcmSourceSlot(int32_t index);
-	};
-
-	// This is required for our rebuild as rage::audMixerDevice::GeneratePcm would normaly take care of it
-	//
-	static hook::thiscall_stub<void*(rage::audMixerDevice*, int32_t)> audMixerDevice__FreePcmSourceSlot([]()
-	{
-		return hook::get_pattern("8B DA 48 8B 89 ? ? ? ? 44 0F AF C2 49 03 C8", -0xC);
-	});
-
-	void* audMixerDevice::FreePcmSourceSlot(int32_t index)
-	{
-		return audMixerDevice__FreePcmSourceSlot(this, index);
+		return *reinterpret_cast<int32_t*>(reinterpret_cast<uintptr_t>(this) + 0x1E8B8);
 	}
+
+	/**
+	* Retrieve the size of one rage::audWavePlayer object
+	*
+	* @return Size of an rage::audWavePlayer object
+	*/
+	int32_t audMixerDevice::GetWavePlayerSize()
+	{
+		return *reinterpret_cast<int32_t*>(reinterpret_cast<uintptr_t>(this) + 0x1E8BC);
+	}
+
+	int32_t* audMixerDevice::GetRefArray()
+	{
+		return reinterpret_cast<int32_t*>(reinterpret_cast<uintptr_t>(this) + 0x1DCB0);
+	}
+
+	/**
+	* Retrieve a single rage::audWavePlayer object
+	*
+	* @param[in] index of the slot to retrieve
+	* @return A pointer to an rage::audWavePlayer object
+	*/
+	class audWavePlayer* audMixerDevice::GetWavePlayerByIndex(size_t index)
+	{
+		uintptr_t wavePlayerArrayStart = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(this) + 0x1E8B0);
+		wavePlayerArrayStart += (index * this->GetWavePlayerSize());
+		return reinterpret_cast<audWavePlayer*>(wavePlayerArrayStart);
+	}
+
+	/**
+	* Wrapper for rage::audWavePlayer::Shutdown and rage::audPcmSourceFactory::FreeSlot
+	*
+	* @param[in] index of the slot to free
+	* @return unknown pointer
+	*/
+	void* audMixerDevice::FreePcmSource(int32_t index)
+	{
+		return stubs::_audMixerDevice::FreePcmSource(this, index);
+	}
+
+	
 
 	namespace audDriver
 	{
@@ -193,7 +192,7 @@ static void rage__audMixerDevice__GeneratePcm(rage::audMixerDevice* thisptr)
 		{
 			// Internally this calls rage::audWavePlayer::Shutdown and then rage::audPcmSourceFactory::FreeSlot
 			// 
-			thisptr->FreePcmSourceSlot(static_cast<int32_t>(i));
+			thisptr->FreePcmSource(static_cast<int32_t>(i));
 			continue;
 		}
 
