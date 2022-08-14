@@ -748,6 +748,24 @@ namespace rage
 			stubs::_audRequestedSettings::SetQuadSpeakerLevels(this, levels);
 		}
 
+		void SetShouldAttenuateOverDistance(bool toggle)
+		{
+			//0xF3 | (4 * (toggle & 1))
+			*((uint8_t*)this + 0x25F) &= toggle ? 0xF7 : 0xF3;
+		}
+
+		void SetShouldUseEnvironmentalOcclusion(bool toggle)
+		{
+			//0xCF | (0x10 * (toggle & 1))
+			*((uint8_t*)this + 0x25F) &= toggle ? 0xDF : 0xCF;
+		}
+
+		void SetShouldUseEnvironmentalReverb(bool toggle)
+		{
+			//0x3F | ((toggle & 1) << 6)
+			*((uint8_t*)this + 0x25F) &= toggle ? 0x7F : 0x3F;
+		}
+
 		void SetVolume(float vol, bool volume_override)
 		{
 			stubs::_audCurve::LinearDb_CalculateValue(vol);
@@ -1128,6 +1146,10 @@ public:
 					1.0f,
 					1.0f,
 					1.0f };
+
+				settings->SetShouldAttenuateOverDistance(false);
+				settings->SetShouldUseEnvironmentalOcclusion(false);
+				settings->SetShouldUseEnvironmentalReverb(false);
 			}
 			else
 			{
