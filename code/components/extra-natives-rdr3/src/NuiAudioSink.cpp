@@ -722,7 +722,7 @@ namespace rage
 
 		void SetSubmixIndex(uint8_t index)
 		{
-			*(uint16_t*)(&m_pad[0x134]) = (uint16_t)index;
+			*(uint16_t*)(&m_pad[0x134]) = (uint16_t)(index - MAX_DEFAULT_SUBMIXES) | 0x20;
 		}
 
 		// TODO remove maybe
@@ -1147,16 +1147,16 @@ public:
 					1.0f,
 					1.0f };
 
-				settings->SetShouldAttenuateOverDistance(false);
-				settings->SetShouldUseEnvironmentalOcclusion(false);
-				settings->SetShouldUseEnvironmentalReverb(false);
+				//settings->SetShouldAttenuateOverDistance(false);
+				//settings->SetShouldUseEnvironmentalOcclusion(false);
+				//settings->SetShouldUseEnvironmentalReverb(false);
 			}
 			else
 			{
 				m_positionForce = {};
 			}
 
-			settings->SetEnvironmentalLoudness(25);
+			//settings->SetEnvironmentalLoudness(25);
 		}
 
 		if (m_environmentGroup)
@@ -1545,12 +1545,12 @@ namespace hooks
 		//				: 588
 		static bool Init(char* sound, void* a, void* b, char* params)
 		{
-			auto oldField = params[86] & 0x3F;
+			auto oldField = params[81] & 0x3F;
 			int submixIdx = -1;
 
-			if (oldField >= 32)
+			if (params[81] != -1 && oldField >= 32)
 			{
-				params[86] &= ~0x3F;
+				//params[81] &= ~0x3F;
 				submixIdx = (oldField - 32) + MAX_DEFAULT_SUBMIXES;
 			}
 
@@ -1558,7 +1558,7 @@ namespace hooks
 
 			if (submixIdx >= 0)
 			{
-				sound[588] |= 0x80;
+				sound[588] |= 0x100;
 				*(int*)(&sound[536]) = submixIdx;
 			}
 
@@ -1653,10 +1653,10 @@ static HookFunction hookFunction([]()
 				cmp(eax, MAX_DEFAULT_SUBMIXES);		// if (eax >= 0x1C) {
 				jl("go");
 				and(byte_ptr[rdi + 587], ~1);		//       (rdi + 586) &= ~0x10
-				or (byte_ptr[rdi + 588], 0x80); //       (rdi + 587) |= 0x80
+				or (byte_ptr[rdi + 588], 0x100);		//       (rdi + 587) |= 0x80
 				jmp("go");							//    }
 				L("unsure");						// } else {
-				test(byte_ptr[rdi + 588], 0x80); //    if ((rdi+248) & 0x80) {
+				test(byte_ptr[rdi + 588], 0x100); //    if ((rdi+248) & 0x80) {
 				jnz("sure");						//        goto sure;
 													//    }
 				mov(eax, 0xFFFFFFFF);				//    eax = -1;
@@ -1812,7 +1812,7 @@ static InitFunction initFunction([]()
 			auto mixer = rage::audDriver::GetMixer();
 			if (auto submix = mixer->CreateSubmix(name.c_str(), 6, true); submix)
 			{
-				int idx = mixer->GetSubmixIndex(submix);				
+				int idx = mixer->GetSubmixIndex(submix);
 
 				submixesByName[hash] = idx;
 
