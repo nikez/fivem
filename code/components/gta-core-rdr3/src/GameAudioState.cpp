@@ -325,7 +325,7 @@ static HookFunction hookFunction([]()
 		rage::audDriver::sm_Mixer		= hook::get_address<char**>(location_smMixer, 3, 7);
 	}
 
-	// In FiveM there is a "temporary fix" here for rockstar editor crashes.
+	// TODO: -> In FiveM there is a "temporary fix" here for rockstar editor crashes.
 	// I assume this is currently not needed as redm doesn't have an editor?
 	//
 	{

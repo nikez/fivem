@@ -40,8 +40,8 @@
 #include "../../components/gta-streaming-rdr3/include/EntitySystem.h"
 
 constexpr int MAX_DEFAULT_SUBMIXES = 14;
-constexpr int MAX_DEFAULT_ALLOCATION_BUCKETS = 8;
-static constexpr int kExtraAudioBuckets = 6;
+constexpr int MAX_DEFAULT_ALLOCATION_BUCKETS = 8; // TODO: Verify that the default value is actually 8 in rdr3
+static constexpr int kExtraAudioBuckets = 6; // TODO: do we need 6 buckets? What is 6 based on. I assume 1 extra sound per player entity and n sounds can fit in one bucket. Do the math essentially and then check if 6 is good in rdr3
 
 static std::shared_mutex g_customEntriesLock;
 static std::shared_mutex g_submixMutex;
@@ -227,15 +227,16 @@ namespace stubs
 	//
 	namespace _audRequestedSettings
 	{
-		static hook::thiscall_stub<void(rage::audRequestedSettings*, float)> SetVolume([]()
+		//TODO obsolete?
+		/*static hook::thiscall_stub<void(rage::audRequestedSettings*, float)> SetVolume([]()
 		{
 			return hook::get_pattern("F3 0F 11 8C 08 20 01 00 00", -0xA);
-		});
+		});*/
 
-		static hook::thiscall_stub<void(rage::audRequestedSettings*, float)> SetVolumeCurveScale([]()
+		/*static hook::thiscall_stub<void(rage::audRequestedSettings*, float)> SetVolumeCurveScale([]()
 		{
 			return hook::get_pattern("F3 0F 11 8C 08 38 01 00 00", -0xA);
-		});
+		});*/
 
 		static hook::thiscall_stub<void(rage::audRequestedSettings*, uint8_t)> SetEnvironmentalLoudness([]()
 		{
@@ -576,6 +577,8 @@ namespace rage
 			stubs::_audSound::StopAndForget(this, a1);
 		}
 
+		//TODO: likely not a member function but actually audSoundPool infrastructure code
+		// maybe refractor out while fixing _settingsBase bs naming into actual audSoundPool structures
 		class audRequestedSettings* GetRequestedSettings()
 		{
 			int16_t v7 = *reinterpret_cast<int16_t*>(reinterpret_cast<char*>(this) + 0xD6);
@@ -725,12 +728,6 @@ namespace rage
 			*(uint16_t*)(&m_pad[0x134]) = (uint16_t)(index - MAX_DEFAULT_SUBMIXES) | 0x20;
 		}
 
-		// TODO remove maybe
-		void SetUnk()
-		{
-			m_pad[311] = 27; 
-		}
-
 		void SetAllocationBucket(uint8_t bucket)
 		{
 			m_pad[310] = bucket;
@@ -742,10 +739,51 @@ namespace rage
 
 	class audRequestedSettings
 	{
+public:
+		enum flags : uint8_t
+		{
+			FLG_DONT_NORMALIZE_AUDIO = 1 << 3 // This flag allows to specify values < 1.0 for audRequestedSettings::Inner::m_Volume
+		};
+
+		struct audRequestedSettings::Inner
+		{
+			float m_DelayReflectionEffectSends[4];
+			float m_Volume;
+			float m_PostSubmixVolumeAttenunation;
+			float m_SourceEffectMix1;
+			float m_SourceEffectMix2;
+			float m_unk_set_in_quadspeaker_levels;
+			float m_VolumeCurveScale;
+			float m_VolumeCurveInterpSecondary;
+			uint16_t m_Pitch;
+			uint8_t m_pad00[6];
+			uint16_t m_CutoffLowPass;
+			uint16_t m_CutoffHighPass;
+			uint8_t m_SpeakerMask;
+			uint8_t m_EnvironmentalLoudness;
+			uint8_t m_pad01[2];
+			uint16_t m_Flags;
+			uint8_t m_pad02[2];
+		};
+		static_assert(sizeof(audRequestedSettings::Inner) == 0x40, "rage::audRequestedSettings::Inner size mismatch");
+
 	public:
+		void SetFlag(flags flag, bool enable)
+		{
+			if (enable)
+				*((uint8_t*)this + 0x25F) |= flag;
+			else
+				*((uint8_t*)this + 0x25F) &= ~flag;
+		}
+
 		void SetQuadSpeakerLevels(float levels[4])
 		{
 			stubs::_audRequestedSettings::SetQuadSpeakerLevels(this, levels);
+		}
+
+		void SetDelayReflectionEffectSends(float levels[4])
+		{
+			memcpy(&this->m_Slots[this->GetRequstedSettingsWriteIndex()].m_DelayReflectionEffectSends, levels, sizeof(float) * 4);
 		}
 
 		void SetShouldAttenuateOverDistance(bool toggle)
@@ -766,22 +804,14 @@ namespace rage
 			*((uint8_t*)this + 0x25F) &= toggle ? 0x7F : 0x3F;
 		}
 
-		void SetVolume(float vol, bool volume_override)
+		void SetVolume(float vol)
 		{
-			stubs::_audCurve::LinearDb_CalculateValue(vol);
-			stubs::_audRequestedSettings::SetVolume(this, vol);
-
-			// see initial set around "80 A7 ? ? ? ? ? 83 C8 FF 83"
-			//
-			if (volume_override)
-				*((char*)this + 607) &= ~8;
-			else
-				*((char*)this + 607) |= 8;
+			this->m_Slots[this->GetRequstedSettingsWriteIndex()].m_Volume = stubs::_audCurve::LinearDb_CalculateValue(vol);
 		}
 
 		void SetVolumeCurveScale(float vol)
 		{
-			stubs::_audRequestedSettings::SetVolumeCurveScale(this, vol);
+			this->m_Slots[this->GetRequstedSettingsWriteIndex()].m_VolumeCurveScale = vol;
 		}
 
 		void SetEnvironmentalLoudness(uint8_t val)
@@ -793,6 +823,52 @@ namespace rage
 		{
 			stubs::_audRequestedSettings::SetSourceEffectMix(this, wet, dry);
 		}
+
+	//private:
+		inline static uint32_t GetRequstedSettingsWriteIndex()
+		{
+			static uint32_t* sm_RequestedSettingsWriteIndex = hook::get_address<uint32_t*>(hook::get_pattern("C7 05 ? ? ? ? ? ? ? ? 0F 45"), 2, 10);
+			if (!sm_RequestedSettingsWriteIndex)
+			{
+				console::DPrintf("audRequestedSettings::GetRequstedSettingsWriteIndex", "Failed to locate rage::audRequestedSettings::sm_RequestedSettingsWriteIndex via pattern\n");
+				__debugbreak();
+			}
+
+			return *sm_RequestedSettingsWriteIndex;
+		}
+
+		rage::audSound* m_audSound;
+		char m_pad00[8];
+		Vec3V m_Position[4];
+		char m_pad01[0xC0]; //struct_a1_1 field_50;
+		rage::audRequestedSettings::Inner m_Slots[4];
+
+
+		/*_BYTE gap210[12];
+		_WORD word21C;
+		__unaligned __declspec(align(1)) _DWORD dword21E;
+		_WORD word222;
+		_BYTE gap224[4];
+		float float228;
+		float m_client_variable;
+		float float230;
+		float float234;
+		_DWORD dword238;
+		_DWORD dword23C;
+		_BYTE gap240[8];
+		naEnvironmentGroup* env_group;
+		_DWORD dword250;
+		_WORD word254;
+		rage::audMixerSyncIdRef mixer_syncid_ref_1;
+		rage::audMixerSyncIdRef mixer_syncid_ref_2;
+		_WORD word25A;
+		char volCurveId_primary;
+		char volCurveId_secondary;
+		_BYTE byte25E;
+		_BYTE flags;
+		_BYTE byte260;
+		_BYTE byte261;
+		char field_262;*/
 	};
 
 	class audEntity
@@ -960,7 +1036,8 @@ namespace rage
 		_settingsBase = hook::get_address<uint64_t*>(location + 0x31);
 	});
 }
-
+float testval = 1.0f;
+bool testbool = false;
 class MumbleAudioEntity : public rage::audEntity, public std::enable_shared_from_this<MumbleAudioEntity>
 {
 public:
@@ -1116,6 +1193,20 @@ public:
 		if (m_sound)
 		{
 			auto settings = m_sound->GetRequestedSettings();
+			if (!settings)
+			{
+				console::DPrintf("MumbleAudioEntity::PreUpdateService", "rage::audExternalStreamSound::GetRequestedSettings returned a nullptr\n");
+				__debugbreak();
+			}
+
+			// This is different from the FiveM Code. If we do not set this flag all the time, volume that are ?smaller then? 1.0 are normalized to 1.0
+			// From what I've observed during testing, this is the usual case for our volumes after they have been processed by audCurve::LinearDb_CalculateValue
+			//
+			settings->SetFlag(rage::audRequestedSettings::flags::FLG_DONT_NORMALIZE_AUDIO, testbool);
+
+			// We always set the default volume to 1.0 and may overwrite it with a defined overrideVolume later
+			//
+			settings->SetVolume(1.0f);
 
 			if (m_distance > 0.01f)
 			{
@@ -1127,36 +1218,45 @@ public:
 			}
 
 			if (m_overrideVolume >= 0.0f)
-				settings->SetVolume(m_overrideVolume, true);
-			else
-				settings->SetVolume(1.0f, false);
-
-			if (m_overrideVolume >= 0.0f)
 			{
-				float levels[4] = { 1.0f,
-					1.0f,
-					1.0f,
-					1.0f };
+				//settings->SetVolume(m_overrideVolume);
 
-				// TODO SetQuadSpeakerLevels behaves differently in rdr than five. It influences the flag at 607 differently
-				auto settings = m_sound->GetRequestedSettings();
+				float levels[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
 				settings->SetQuadSpeakerLevels(levels);
+
+				// Same as SetQuadSpeakerLevel, just testing here.
+				// Not setting 0x8000 -> sound is still directional
+				/*memcpy(&settings->m_Position[settings->GetRequstedSettingsWriteIndex()], levels, sizeof(float) * 4);
+				settings->m_Slots[settings->GetRequstedSettingsWriteIndex()].m_unk_set_in_quadspeaker_levels = 0;
+				settings->m_Slots[settings->GetRequstedSettingsWriteIndex()].m_Flags |= 0x8000u;
+				*((char*)settings + 607) &= 0xF3;*/
 
 				m_positionForce = { 1.0f,
 					1.0f,
 					1.0f,
 					1.0f };
 
-				//settings->SetShouldAttenuateOverDistance(false);
-				//settings->SetShouldUseEnvironmentalOcclusion(false);
-				//settings->SetShouldUseEnvironmentalReverb(false);
+				//rage::audRequestedSettings::SetShouldUseEnvironmentalReverb
+				//*(uint8_t*)(settings + 0x25F) = *(uint8_t*)(settings + 0x25F) & 0xCF | (0x10 * testbool);
+
+				//rage::audRequestedSettings::SetShouldUseEnvironmentalReverb
+				//*(uint8_t*)(settings + 0x25F) = *(uint8_t*)(settings + 0x25F) & 0x3F | (testbool << 6);
+
+				/*settings->SetShouldAttenuateOverDistance(testbool);
+				settings->SetShouldUseEnvironmentalOcclusion(testbool);
+				settings->SetShouldUseEnvironmentalReverb(testbool);*/
 			}
 			else
 			{
 				m_positionForce = {};
 			}
 
+			
+			//settings->m_Slots[settings->GetRequstedSettingsWriteIndex()].m_unk_set_in_quadspeaker_levels = testval;
+
 			//settings->SetEnvironmentalLoudness(25);
+			
 		}
 
 		if (m_environmentGroup)
