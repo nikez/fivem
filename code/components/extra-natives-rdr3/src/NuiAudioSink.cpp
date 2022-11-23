@@ -1037,7 +1037,7 @@ public:
 	});
 }
 float testval = 1.0f;
-bool testbool = false;
+bool testbool = true;
 class MumbleAudioEntity : public rage::audEntity, public std::enable_shared_from_this<MumbleAudioEntity>
 {
 public:
@@ -1219,66 +1219,53 @@ public:
 
 			if (m_overrideVolume >= 0.0f)
 			{
+				//TODO: this maxes radio quiter than proxymity. Is this desired? Are there natives to do it?
 				//settings->SetVolume(m_overrideVolume);
 
 				float levels[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-
 				settings->SetQuadSpeakerLevels(levels);
-
-				// Same as SetQuadSpeakerLevel, just testing here.
-				// Not setting 0x8000 -> sound is still directional
-				/*memcpy(&settings->m_Position[settings->GetRequstedSettingsWriteIndex()], levels, sizeof(float) * 4);
-				settings->m_Slots[settings->GetRequstedSettingsWriteIndex()].m_unk_set_in_quadspeaker_levels = 0;
-				settings->m_Slots[settings->GetRequstedSettingsWriteIndex()].m_Flags |= 0x8000u;
-				*((char*)settings + 607) &= 0xF3;*/
 
 				m_positionForce = { 1.0f,
 					1.0f,
 					1.0f,
 					1.0f };
-
-				//rage::audRequestedSettings::SetShouldUseEnvironmentalReverb
-				//*(uint8_t*)(settings + 0x25F) = *(uint8_t*)(settings + 0x25F) & 0xCF | (0x10 * testbool);
-
-				//rage::audRequestedSettings::SetShouldUseEnvironmentalReverb
-				//*(uint8_t*)(settings + 0x25F) = *(uint8_t*)(settings + 0x25F) & 0x3F | (testbool << 6);
-
-				/*settings->SetShouldAttenuateOverDistance(testbool);
-				settings->SetShouldUseEnvironmentalOcclusion(testbool);
-				settings->SetShouldUseEnvironmentalReverb(testbool);*/
 			}
 			else
 			{
 				m_positionForce = {};
 			}
-
-			
-			//settings->m_Slots[settings->GetRequstedSettingsWriteIndex()].m_unk_set_in_quadspeaker_levels = testval;
-
-			//settings->SetEnvironmentalLoudness(25);
-			
 		}
 
 		if (m_environmentGroup)
 		{
-			m_environmentGroup->SetPosition(m_position);
-
-			if (m_ped)
+			rage::fwInteriorLocation interiorLocation;
+			if (m_overrideVolume >= 0.0f)
 			{
-				rage::fwInteriorLocation interiorLocation;
-				stubs::_fwEntity::getAudioInteriorLocation(m_ped, interiorLocation);
-
-				// if this isn't an interior, reset the interior pointer thing
-				if (interiorLocation.GetInteriorIndex() == 0xFFFF)
+				//Set to invalid world pos / QuadLevelSpeaker pos
+				//
+				m_environmentGroup->SetPosition(m_positionForce);
+			}
+			else
+			{
+				if (m_ped)
 				{
-					// xbuild: SetInteriorLocation provides a hint as to the voff
-
-					char* envGroup = (char*)m_environmentGroup;
-					*(void**)(envGroup + 872) = nullptr;
-					*(void**)(envGroup + 880) = nullptr;
+					stubs::_fwEntity::getAudioInteriorLocation(m_ped, interiorLocation);
 				}
 
-				m_environmentGroup->SetInteriorLocation(interiorLocation);
+				m_environmentGroup->SetPosition(m_position);
+			}
+
+			// Either set to the current Ped's interior location or to invalid
+			//
+			m_environmentGroup->SetInteriorLocation(interiorLocation);
+
+			// If this isn't an interior, reset the interior pointer thing
+			//
+			if (interiorLocation.GetInteriorIndex() == 0xFFFF)
+			{
+				char* envGroup = (char*)m_environmentGroup;
+				*(void**)(envGroup + 872) = nullptr;
+				*(void**)(envGroup + 880) = nullptr;
 			}
 		}
 	}
@@ -1799,12 +1786,14 @@ static HookFunction hookFunction([]()
 
 			static void DoVoiceRoute(uint8_t* voiceData, int* outRoutes)
 			{
-				// TODO: If this is truly "our first submix", it should be > 14 not >= 14
-				// Current issue most likely because we don't mark the data as "dealth with" in the stub above. Probably why it is rendered normal without effects. Maybe try to locate actual flags we should use
-				// Also verify 3C as out route
 				if (voiceData[0x148] != 0xFF && voiceData[0x148] >= MAX_DEFAULT_SUBMIXES) // first route we have 'ourselves'
 				{
 					outRoutes[0] = voiceData[0x148];
+
+					// This is different from FiveM. Without this, submix audio would bleed into other routes with a delay, creating a strange echo effect
+					// I tried searching for flags multiple hours, with no success
+					//
+					outRoutes[1] = outRoutes[2] = outRoutes[3] = outRoutes[4] = outRoutes[5] = 0xFF;
 				}
 			}
 		} computeVoiceRoutesStub;
