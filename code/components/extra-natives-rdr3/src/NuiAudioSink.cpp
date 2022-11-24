@@ -842,33 +842,6 @@ public:
 		Vec3V m_Position[4];
 		char m_pad01[0xC0]; //struct_a1_1 field_50;
 		rage::audRequestedSettings::Inner m_Slots[4];
-
-
-		/*_BYTE gap210[12];
-		_WORD word21C;
-		__unaligned __declspec(align(1)) _DWORD dword21E;
-		_WORD word222;
-		_BYTE gap224[4];
-		float float228;
-		float m_client_variable;
-		float float230;
-		float float234;
-		_DWORD dword238;
-		_DWORD dword23C;
-		_BYTE gap240[8];
-		naEnvironmentGroup* env_group;
-		_DWORD dword250;
-		_WORD word254;
-		rage::audMixerSyncIdRef mixer_syncid_ref_1;
-		rage::audMixerSyncIdRef mixer_syncid_ref_2;
-		_WORD word25A;
-		char volCurveId_primary;
-		char volCurveId_secondary;
-		_BYTE byte25E;
-		_BYTE flags;
-		_BYTE byte260;
-		_BYTE byte261;
-		char field_262;*/
 	};
 
 	class audEntity
@@ -1070,7 +1043,6 @@ public:
 		std::lock_guard _(m_render);
 		m_environmentGroup = rage::naEnvironmentGroup::Create();
 		m_environmentGroup->Init(nullptr, 20.0f, 1000, 4000, 0.5f, 1000);
-		m_environmentGroup->SetPosition(m_position);
 
 		rage::audSoundInitParams initValues;
 
@@ -1082,13 +1054,15 @@ public:
 			initValues.SetCategory(category);
 		}
 
-		initValues.SetPositional(true);
-
-		initValues.SetEnvironmentGroup(m_environmentGroup);
-
 		if (m_submixId >= 0)
 		{
 			initValues.SetSubmixIndex(m_submixId);
+		}
+		else
+		{
+			m_environmentGroup->SetPosition(m_position);
+			initValues.SetEnvironmentGroup(m_environmentGroup);
+			initValues.SetPositional(true);
 		}
 
 		if (m_soundBucket == 0xFF)
@@ -1234,39 +1208,8 @@ public:
 			{
 				m_positionForce = {};
 			}
-		}
 
-		if (m_environmentGroup)
-		{
-			rage::fwInteriorLocation interiorLocation;
-			if (m_overrideVolume >= 0.0f)
-			{
-				//Set to invalid world pos / QuadLevelSpeaker pos
-				//
-				m_environmentGroup->SetPosition(m_positionForce);
-			}
-			else
-			{
-				if (m_ped)
-				{
-					stubs::_fwEntity::getAudioInteriorLocation(m_ped, interiorLocation);
-				}
-
-				m_environmentGroup->SetPosition(m_position);
-			}
-
-			// Either set to the current Ped's interior location or to invalid
-			//
-			m_environmentGroup->SetInteriorLocation(interiorLocation);
-
-			// If this isn't an interior, reset the interior pointer thing
-			//
-			if (interiorLocation.GetInteriorIndex() == 0xFFFF)
-			{
-				char* envGroup = (char*)m_environmentGroup;
-				*(void**)(envGroup + 872) = nullptr;
-				*(void**)(envGroup + 880) = nullptr;
-			}
+			settings->SetEnvironmentalLoudness(25);
 		}
 	}
 
