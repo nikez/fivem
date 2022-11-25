@@ -116,17 +116,6 @@ export class SettingsService {
 			category: '#SettingsCat_Interface',
 		});
 
-		if (this.gameService.gameName === 'rdr3') {
-			this.addSetting('muteOnFocusLoss', {
-				name: '#Settings_MuteOnFocusLoss',
-				description: '#Settings_MuteOnFocusLossDesc',
-				type: 'checkbox',
-				getCb: () => this.gameService.getConvar('ui_muteOnFocusLoss').pipe(map(a => a === 'true' ? 'true' : 'false')),
-				setCb: (value) => this.gameService.setConvar('ui_muteOnFocusLoss', value === 'true' ? 'true' : 'false'),				
-				category: '#SettingsCat_Interface',
-			});
-		}
-
 		if (this.gameService.gameName !== 'ny') {
 			this.addSetting('menuAudio', {
 				name: '#Settings_MenuAudio',
@@ -295,6 +284,15 @@ export class SettingsService {
 				'beta': 'Beta',
 				'canary': 'Latest (Unstable)',
 			},
+			category: '#SettingsCat_Game',
+		});
+
+		this.addSetting('useAudioFrameLimiter', {
+			name: '#Settings_UseAudioFrameLimiter',
+			description: '#Settings_UseAudioFrameLimiterDesc',
+			type: 'checkbox',
+			getCb: () => this.gameService.getConvar('game_useAudioFrameLimiter').pipe(map(a => a === 'true' ? 'false' : 'true')),
+			setCb: (value) => this.gameService.setConvar('game_useAudioFrameLimiter', value === 'true' ? 'false' : 'true'),
 			category: '#SettingsCat_Game',
 		});
 	}

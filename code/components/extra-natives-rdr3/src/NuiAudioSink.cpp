@@ -227,17 +227,6 @@ namespace stubs
 	//
 	namespace _audRequestedSettings
 	{
-		//TODO obsolete?
-		/*static hook::thiscall_stub<void(rage::audRequestedSettings*, float)> SetVolume([]()
-		{
-			return hook::get_pattern("F3 0F 11 8C 08 20 01 00 00", -0xA);
-		});*/
-
-		/*static hook::thiscall_stub<void(rage::audRequestedSettings*, float)> SetVolumeCurveScale([]()
-		{
-			return hook::get_pattern("F3 0F 11 8C 08 38 01 00 00", -0xA);
-		});*/
-
 		static hook::thiscall_stub<void(rage::audRequestedSettings*, uint8_t)> SetEnvironmentalLoudness([]()
 		{
 			return hook::get_pattern("8B 05 ? ? ? ? 48 C1 E0 06 88 94 08 ? ? ? ? C3 90");
