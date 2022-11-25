@@ -1,3 +1,7 @@
+includedirs { '../voip-mumble/include' }
+libdirs { '../voip-mumble/lib' }
+links { 'avutil', 'swresample' }
+
 return function()
 	filter {}
 
@@ -8,5 +12,9 @@ return function()
 	files {
 		'components/extra-natives-five/src/VisualSettingsNatives.cpp',
 		'components/extra-natives-five/src/PoolTraversalNatives.cpp',
+		'components/extra-natives-five/src/RadioDSP.cpp',
+		'components/extra-natives-five/include/audDspEffect.h',
 	}
+
+	add_dependencies { 'vendor:dspfilters' }
 end
