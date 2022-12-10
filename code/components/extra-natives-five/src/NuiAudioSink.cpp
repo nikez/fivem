@@ -2340,7 +2340,6 @@ static HookFunction hookFunction([]()
 #ifdef GTA_FIVE
 		auto location = hook::get_pattern<char>("48 8B CB C7 44 24 28 58 CB 00 00 44 88 74 24 20 E8", -0x2C4);
 		hook::set_call(&g_origOddFunc, location + 0x2D4);
-		auto location = hook::get_pattern<char>("66 85 C0 74 2C BA ? ? ? ? 48", -0x53);
 
 		MH_Initialize();
 		MH_CreateHook(location, audEnvironmentSound_InitStub, (void**)&g_origaudEnvironmentSound_Init);
