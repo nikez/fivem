@@ -296,6 +296,7 @@ class audRequestedSettings;
 class audSound
 {
 public:
+#ifdef GTA_FIVE
 	virtual ~audSound() = 0;
 
 	virtual void m_8() = 0;
@@ -307,7 +308,35 @@ public:
 	virtual void Init() = 0;
 
 	virtual void m_28() = 0;
+#elif IS_RDR3
+	virtual bool FindAndSetVariableValueWrapper(void) = 0;
 
+	virtual bool FindAndSetVariableValue(void) = 0;
+
+	virtual bool FindAndSetVariableHashValue(void) = 0;
+
+	virtual void throw__0x52D76AA0_01() = 0;
+
+	virtual uint64_t Pause(uint32_t unk) = 0;
+
+	virtual uint64_t FindVariableDownHierarchy(uint32_t, uint32_t) = 0;
+
+	virtual uint64_t FindVariableUpHierarchy(uint32_t, bool) = 0;
+
+	virtual ~audSound() = 0;
+
+	virtual uint64_t Init(const class audSoundInternalInitParams*, class audSoundScratchInitParams*, void*) = 0;
+
+	virtual void throw__0x52D76AA0_02() = 0;
+
+	virtual void throw__0x52D76AA0_03() = 0;
+
+	virtual void throw__0x52D76AA0_04() = 0;
+
+	virtual void throw__0x52D76AA0_05() = 0;
+
+	virtual uint64_t ActionReleaseRequest(uint32_t) = 0;
+#endif
 	void PrepareAndPlay(audWaveSlot* waveSlot, bool a2, int a3, bool a4);
 
 	void StopAndForget(bool a1);
@@ -1191,7 +1220,18 @@ static hook::cdecl_stub<void()> _updateAudioThread([]()
 {
 	return hook::get_pattern("40 0F 95 C7 40 84 FF 74 05", -0x14);
 });
+#elif IS_RDR3
+static hook::cdecl_stub<void(bool update_envgroups)> _updateAudioThread([]()
+{
+	return hook::get_pattern("40 8A E9 48 8B 0D", -0x14);
+});
+
+static hook::thiscall_stub<void(rage::audEntity*, bool a2, bool a3)> StartMenuMusic([]()
+{
+	return hook::get_call(hook::get_pattern("E8 ? ? ? ? E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8D 94 24"));
+});
 #endif
+
 
 extern "C" {
 #include <libswresample/swresample.h>
@@ -2538,10 +2578,10 @@ static InitFunction initFunction([]()
 	{
 		netLibrary = lib;
 	});
-#ifdef GTA_FIVE
 	OnGameFrame.Connect([]()
 	{
 		static ConVar<bool> arenaWarVariable("ui_disableMusicTheme", ConVar_Archive, false);
+#ifdef GTA_FIVE
 		static ConVar<bool> arenaWarVariableForce("ui_forceMusicTheme", ConVar_Archive, false);
 		static ConVar<std::string> musicThemeVariable("ui_selectMusic", ConVar_Archive, "dlc_awxm2018_theme_5_stems");
 		static std::string lastSong = musicThemeVariable.GetValue();
@@ -2681,8 +2721,42 @@ static InitFunction initFunction([]()
 				swapSong = false;
 			}
 		}
-	});
+#elif IS_RDR3
+		static int last_connection_state = -1;
+		static bool wait_for_initial_game_init = false;
+
+		if (audioRunning && last_connection_state != NetLibrary::CS_ACTIVE && rage::g_frontendAudioEntity)
+		{
+			rage::audSound* envelopeSound = *(rage::audSound**)((uintptr_t)rage::g_frontendAudioEntity + 0x358);
+			if (!envelopeSound && wait_for_initial_game_init)
+			{
+				return;
+			}
+			wait_for_initial_game_init = false;
+
+			if (envelopeSound && arenaWarVariable.GetValue())
+			{
+				envelopeSound->ActionReleaseRequest(0);
+				envelopeSound->StopAndForget(0);
+				_updateAudioThread(0);
+			}
+			else if (!envelopeSound && !arenaWarVariable.GetValue())
+			{
+				StartMenuMusic(rage::g_frontendAudioEntity, 0, 0);
+			}
+		}
+
+		if (netLibrary->GetConnectionState() != last_connection_state)
+		{
+			if (last_connection_state == NetLibrary::CS_CONNECTED || last_connection_state == -1)
+			{
+				wait_for_initial_game_init = true;
+			}
+
+			last_connection_state = netLibrary->GetConnectionState();
+		}
 #endif
+	});
 
 	OnMainGameFrame.Connect([]()
 	{
