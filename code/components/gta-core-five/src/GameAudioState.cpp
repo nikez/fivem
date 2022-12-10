@@ -12,11 +12,19 @@
 #include <MinHook.h>
 
 static bool* audioNotFocused;
-static int* muteOnFocusLoss; 
+#ifdef GTA_FIVE
+static int* muteOnFocusLoss;
+#elif IS_RDR3
+static bool muteOnFocusLoss = false;
+#endif
 
 bool DLL_EXPORT ShouldMuteGameAudio()
 {
-	return *audioNotFocused; //&& *muteOnFocusLoss;
+#if GTA_FIVE
+	return *audioNotFocused && *muteOnFocusLoss;
+#elif IS_RDR3
+	return !(*audioNotFocused) && muteOnFocusLoss;
+#endif
 }
 
 bool g_audUseFrameLimiterConVar;
@@ -102,22 +110,38 @@ struct audMixerDevice
 	// Offsets are the same 1604-2545
 	inline int GetMaxWavePlayers()
 	{
+#ifdef GTA_FIVE
 		return *(int*)(((uintptr_t)this) + 0xEA08);
+#elif IS_RDR3
+		return *(int*)(((uintptr_t)this) + 0x1E8B8);
+#endif
 	}
 
 	inline int GetWavePlayerSize()
 	{
+#ifdef GTA_FIVE
 		return *(int*)(((uintptr_t)this) + 0xEA0C);
+#elif IS_RDR3
+		return *(int*)(((uintptr_t)this) + 0x1E8BC);
+#endif
 	}
 
 	inline int* GetRefArray()
 	{
+#ifdef GTA_FIVE
 		return (int*)(((uintptr_t)this) + 0xDE00);
+#elif IS_RDR3
+		return (int*)(((uintptr_t)this) + 0x1DCB0);
+#endif
 	}
 
 	inline audWavePlayer* GetWavePlayerByIndex(int index)
 	{
+#ifdef GTA_FIVE
 		uintptr_t wavePlayerArrayStart = *(uintptr_t*)(((uintptr_t)this) + 0xEA00);
+#elif IS_RDR3
+		uintptr_t wavePlayerArrayStart = *(uintptr_t*)(((uintptr_t)this) + 0x1E8B0);
+#endif
 		wavePlayerArrayStart += (index * GetWavePlayerSize());
 		return (audWavePlayer*)wavePlayerArrayStart;
 	}
@@ -154,7 +178,11 @@ static void rage__audMixerDevice__GeneratePcm(rage::audMixerDevice* thisptr)
 	// original size is 64, problem is that numActivePlayers can go up to the maxWavePlayers(0x300)
 	rage::wavePlayerStruct audMixerSyncSignalArray[0x301];
 
+#ifdef GTA_FIVE
 	auto validBits = (int*)((uintptr_t)thisptr + 0xD498);
+#elif IS_RDR3
+	auto validBits = (int*)((uintptr_t)thisptr + 0x1D348);
+#endif
 
 	for (size_t i = 0; i < maxWavePlayers; i++)
 	{
@@ -245,10 +273,9 @@ static void rage__audMixerDevice__GeneratePcm(rage::audMixerDevice* thisptr)
 				*(int*)(voiceInst + 12) |= (wavePlayer->HasStartedPlayback()) << 19;
 			}
 #elif IS_RDR3
-			*(int*)(voiceInst + 8) = wavePlayer->IsFinished() ? -1 : wavePlayer->GetPlayPositionSamples();
-			*(uint16_t*)(voiceInst + 12) = wavePlayer->GetNumberOfChannels(); // not in 1604
-			*(int*)(voiceInst + 16) &= 0xFFF7FFFF; // clear hasStarted flag
-			*(int*)(voiceInst + 16) |= (wavePlayer->HasStartedPlayback()) << 19;
+			*(uint16_t*)(voiceInst + 8) = wavePlayer->GetNumberOfChannels();
+			*(int*)(voiceInst + 12) &= 0xFFF7FFFF; // clear hasStarted flag
+			*(int*)(voiceInst + 12) |= (wavePlayer->HasStartedPlayback()) << 19;
 #endif
 		}
 		else
@@ -260,7 +287,11 @@ static void rage__audMixerDevice__GeneratePcm(rage::audMixerDevice* thisptr)
 	for (int arrIndex = 0; arrIndex < numActivePlayers; arrIndex++)
 	{
 		rage::audWavePlayer* wavePlayer = thisptr->GetWavePlayerByIndex(audMixerSyncSignalArray[arrIndex].wavePlayerIndex);
+#ifdef GTA_FIVE
 		int v18 = *(int*)(*rage::audDriver::sm_Mixer + 4 * audMixerSyncSignalArray[arrIndex].wavePlayerState + 0xF498);
+#elif IS_RDR3
+		int v18 = *(int*)(*rage::audDriver::sm_Mixer + 4 * audMixerSyncSignalArray[arrIndex].wavePlayerState + 0x1FB3C);
+#endif
 		if ((BYTE2(v18) || HIBYTE(v18)) && wavePlayer->ProcessSyncSignal(&v18) || !audMixerSyncSignalArray[arrIndex].wavePlayerAreStatesEqual)
 		{
 #ifdef GTA_FIVE
@@ -313,10 +344,9 @@ static void rage__audMixerDevice__GeneratePcm(rage::audMixerDevice* thisptr)
 						*(int*)(voiceInst + 12) |= (wavePlayer->HasStartedPlayback()) << 19;
 					}
 #elif IS_RDR3
-					*(int*)(voiceInst + 8) = wavePlayer->IsFinished() ? -1 : wavePlayer->GetPlayPositionSamples();
-					*(uint16_t*)(voiceInst + 12) = wavePlayer->GetNumberOfChannels(); // not in 1604
-					*(int*)(voiceInst + 16) &= 0xFFF7FFFF; // clear hasStarted flag
-					*(int*)(voiceInst + 16) |= (wavePlayer->HasStartedPlayback()) << 19;
+					*(uint16_t*)(voiceInst + 8) = wavePlayer->GetNumberOfChannels();
+					*(int*)(voiceInst + 12) &= 0xFFF7FFFF; // clear hasStarted flag
+					*(int*)(voiceInst + 12) |= (wavePlayer->HasStartedPlayback()) << 19;
 #endif
 				}
 			}
@@ -441,4 +471,7 @@ static HookFunction hookFunction([]()
 	}
 
 	static ConVar<bool> audUseFrameLimiter("game_useAudioFrameLimiter", ConVar_Archive, true, &g_audUseFrameLimiterConVar);
+#if IS_RDR3
+	static ConVar<bool> uiMuteOnFocusLoss("ui_muteOnFocusLoss", ConVar_Archive, muteOnFocusLoss, &muteOnFocusLoss);
+#endif
 });

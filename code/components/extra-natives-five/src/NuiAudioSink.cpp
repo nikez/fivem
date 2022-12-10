@@ -318,6 +318,11 @@ public:
 #ifdef GTA_FIVE
 	char pad[141 - 8];
 	uint8_t unkBitFlag : 3;
+#elif IS_RDR3
+	char pad_0008[152];
+	uint8_t bucketID;
+	char pad_00A1[53];
+	uint16_t settingsID;
 #endif
 };
 
@@ -639,7 +644,7 @@ void audSoundInitParams::SetSubmixIndex(uint8_t submix)
 	//*(uint8_t*)(&m_pad[0x98]) = submix;
 	//*(uint16_t*)(&m_pad[0x9B]) = 3;
 #elif IS_RDR3
-	m_pad[0x134] = (submix - 0x14) | 0x20;
+	*(uint16_t*)(&m_pad[0x134]) = (uint16_t)(submix);
 #endif
 }
 
@@ -777,6 +782,12 @@ public:
 
 	virtual ~audEntity();
 
+#if IS_RDR3
+	virtual void unk_0x8()
+	{
+	}
+#endif
+
 	virtual void Init();
 
 	virtual void Shutdown();
@@ -787,6 +798,12 @@ public:
 	{
 	}
 
+#if IS_RDR3
+	virtual void PreUpdateServiceInternal(uint32_t a1)
+	{
+	}
+#endif
+
 	virtual void PostUpdate()
 	{
 	}
@@ -794,6 +811,22 @@ public:
 	virtual void UpdateSound(rage::audSound*, rage::audRequestedSettings*, uint32_t)
 	{
 	}
+
+#if IS_RDR3
+	virtual bool HasPendingAnimEvents()
+	{
+		return false;
+	}
+
+	virtual bool HasPendingDeferredSounds()
+	{
+		return false;
+	}
+
+	virtual void unk_0x58()
+	{
+	}
+#endif
 
 	virtual bool IsUnpausable()
 	{
@@ -809,6 +842,19 @@ public:
 	{
 	}
 
+#if IS_RDR3
+	virtual uint64_t GetEnvironmentGroup(bool a1)
+	{
+		return 0;
+	}
+
+	virtual uint64_t GetEnvironmentGroupReadOnly()
+	{
+		return 0;
+	}
+#endif
+
+
 	virtual rage::Vec3V GetPosition()
 	{
 		return { 0.f, 0.f, 0.f, 0.f };
@@ -818,6 +864,11 @@ public:
 	{
 		return { 0.f, 0.f };
 	}
+#if IS_RDR3
+	virtual void unk_0x98()
+	{
+	}
+#endif
 
 	virtual uint32_t InitializeEntityVariables()
 	{
@@ -835,6 +886,9 @@ public:
 	void CreateSound_PersistentReference(uint32_t nameHash, audSound** outSound, const audSoundInitParams& params);
 
 private:
+#if IS_RDR3
+	char m_pad[8] = {};
+#endif
 	uint16_t m_entityId{
 		0xffff
 	};
@@ -842,6 +896,12 @@ private:
 	uint16_t m_0A{
 		0xffff
 	};
+
+#if IS_RDR3
+	uint32_t state{
+		1
+	};
+#endif
 };
 
 audEntity::audEntity()
@@ -1156,7 +1216,7 @@ public:
 
 	virtual void Shutdown() override;
 
-	void MInit();
+	void MInit(float overrideVolume);
 
 	void MShutdown();
 
@@ -1299,7 +1359,7 @@ void MumbleAudioEntity::Init()
 {
 	rage::audEntity::Init();
 
-	MInit();
+	MInit(m_overrideVolume);
 }
 
 void MumbleAudioEntity::Shutdown()
@@ -1320,7 +1380,7 @@ void MumbleAudioEntity::Poll(int samples)
 static constexpr int kExtraAudioBuckets = 6;
 static uint32_t bucketsUsed[kExtraAudioBuckets];
 
-void MumbleAudioEntity::MInit()
+void MumbleAudioEntity::MInit(float overrideVolume)
 {
 	std::lock_guard _(m_render);
 	m_environmentGroup = naEnvironmentGroup::Create();
@@ -1337,9 +1397,18 @@ void MumbleAudioEntity::MInit()
 		initValues.SetCategory(category);
 	}
 
+#ifdef GTA_FIVE
 	initValues.SetPositional(true);
 
 	initValues.SetEnvironmentGroup(m_environmentGroup);
+#elif IS_RDR3
+	if (overrideVolume < 0.0)
+	{
+		m_environmentGroup->SetPosition(m_position);
+		initValues.SetEnvironmentGroup(m_environmentGroup);
+		initValues.SetPositional(true);
+	}
+#endif
 
 	if (m_submixId >= 0)
 	{
@@ -1367,7 +1436,11 @@ void MumbleAudioEntity::MInit()
 		}
 	}
 
+#ifdef GTA_FIVE
 	initValues.SetAllocationBucket(12 + m_soundBucket);
+#elif IS_RDR3
+	initValues.SetAllocationBucket(8 + m_soundBucket);
+#endif
 
 	// CreateSound_PersistentReference(0xD8CE9439, (rage::audSound**)&m_sound, initValues);
 #ifdef GTA_FIVE
@@ -1474,11 +1547,11 @@ void MumbleAudioEntity::PreUpdateService(uint32_t)
 			settings->SetVolumeCurveScale(1.0f);
 		}
 
+#ifdef GTA_FIVE
 		if (m_overrideVolume >= 0.0f)
 		{
 			settings->SetVolume(rage::GetDbForLinear(m_overrideVolume));
 
-#ifdef GTA_FIVE
 			if (xbr::IsGameBuildOrGreater<2189>())
 			{
 				// see initial set around "48 C7 41 68 00 00 80 3F"
@@ -1488,15 +1561,11 @@ void MumbleAudioEntity::PreUpdateService(uint32_t)
 			{
 				*((char*)settings + 369) &= ~8;
 			}
-#elif IS_RDR3
-			*((char*)settings + 0x25F) &= ~8;
-#endif
 		}
 		else
 		{
 			settings->SetVolume(rage::GetDbForLinear(1.0f));
 
-#ifdef GTA_FIVE
 			if (xbr::IsGameBuildOrGreater<2189>())
 			{
 				*((char*)settings + 377) |= 8;
@@ -1505,10 +1574,11 @@ void MumbleAudioEntity::PreUpdateService(uint32_t)
 			{
 				*((char*)settings + 369) |= 8;
 			}
-#elif IS_RDR3
-			*((char*)settings + 0x25F) |= 8;
-#endif
 		}
+#elif IS_RDR3
+		settings->SetVolume(rage::GetDbForLinear(1.0f));
+		*((char*)settings + 0x25F) |= 8;
+#endif
 
 		if (m_overrideVolume >= 0.0f)
 		{
@@ -1553,6 +1623,7 @@ void MumbleAudioEntity::PreUpdateService(uint32_t)
 	return;
 #endif
 
+#ifdef GTA_FIVE
 	if (m_environmentGroup)
 	{
 		m_environmentGroup->SetPosition(m_position);
@@ -1565,23 +1636,43 @@ void MumbleAudioEntity::PreUpdateService(uint32_t)
 			// if this isn't an interior, reset the interior pointer thing
 			if (interiorLocation.GetInteriorIndex() == 0xFFFF)
 			{
-#ifdef GTA_FIVE
 				// xbuild: SetInteriorLocation provides a hint as to the voff
 				size_t voff = (xbr::IsGameBuildOrGreater<2189>()) ? 8 : 0;
 
 				char* envGroup = (char*)m_environmentGroup;
 				*(void**)(envGroup + 240 + voff) = nullptr;
 				*(void**)(envGroup + 248 + voff) = nullptr;
-#elif IS_RDR3
-				char* envGroup = (char*)m_environmentGroup;
-				*(void**)(envGroup + 872) = nullptr;
-				*(void**)(envGroup + 880) = nullptr;
-#endif
 			}
 
 			m_environmentGroup->SetInteriorLocation(interiorLocation);
 		}
 	}
+#elif IS_RDR3
+	if (m_environmentGroup && m_overrideVolume < 0.0f)
+	{
+		rage::fwInteriorLocation interiorLocation;
+
+		if (m_ped)
+		{
+			_entity_getAudioInteriorLocation(m_ped, interiorLocation);
+
+			m_environmentGroup->SetPosition(m_position);
+
+			// Either set to the current Ped's interior location or to invalid
+			//
+			m_environmentGroup->SetInteriorLocation(interiorLocation);
+		}
+
+		// If this isn't an interior, reset the interior pointer thing
+		//
+		if (interiorLocation.GetInteriorIndex() == 0xFFFF)
+		{
+			char* envGroup = (char*)m_environmentGroup;
+			*(void**)(envGroup + 872) = nullptr;
+			*(void**)(envGroup + 880) = nullptr;
+		}
+	}
+#endif
 
 	if (m_poller)
 	{
@@ -1719,8 +1810,13 @@ void MumbleAudioSink::PushAudio(int16_t* pcm, int len)
 
 void MumbleAudioSink::Process()
 {
+#ifdef GTA_FIVE
 	static auto getByServerId = fx::ScriptEngine::GetNativeHandler(HashString("GET_PLAYER_FROM_SERVER_ID"));
 	static auto getPlayerPed = fx::ScriptEngine::GetNativeHandler(0x43A66C31C68491C0);
+#elif IS_RDR3
+	static auto getByServerId = fx::ScriptEngine::GetNativeHandler(0x344EA166);
+	static auto getPlayerPed = fx::ScriptEngine::GetNativeHandler(0x275F255ED201B937);
+#endif
 	static auto getEntityAddress = fx::ScriptEngine::GetNativeHandler(HashString("GET_ENTITY_ADDRESS"));
 
 #if 0
@@ -1788,7 +1884,7 @@ void MumbleAudioSink::Process()
 
 			m_entity->MShutdown();
 			m_entity->SetSubmixId(submixId);
-			m_entity->MInit();
+			m_entity->MInit(m_overrideVolume);
 		}
 
 		m_entity->SetPosition((float*)&m_position, m_distance, m_overrideVolume);
@@ -2011,7 +2107,6 @@ static bool (*g_origaudEnvironmentSound_Init)(void* sound, void* a, void* b, voi
 
 static bool audEnvironmentSound_InitStub(char* sound, void* a, void* b, char* params)
 {
-#ifdef GTA_FIVE
 	auto oldField = params[21] & 0x3F;
 	int submixIdx = -1;
 
@@ -2030,26 +2125,6 @@ static bool audEnvironmentSound_InitStub(char* sound, void* a, void* b, char* pa
 	}
 
 	return rv;
-#elif IS_RDR3
-	auto oldField = params[81] & 0x3F;
-	int submixIdx = -1;
-
-	if (params[81] != -1 && oldField >= 32)
-	{
-		// params[81] &= ~0x3F;
-		submixIdx = (oldField - 32) + 14;
-	}
-
-	bool rv = g_origaudEnvironmentSound_Init(sound, a, b, params);
-
-	if (submixIdx >= 0)
-	{
-		sound[588] |= 0x80;
-		*(int*)(&sound[536]) = submixIdx;
-	}
-
-	return rv;
-#endif
 }
 
 static void (*g_origaudMixerDevice_InitClientThread)(void* device, const char* name, uint32_t size);
@@ -2063,9 +2138,14 @@ static bool (*g_orig_audConfig_GetData_uint)(const char*, uint32_t&);
 
 static bool audConfig_GetData_uint(const char* param, uint32_t& out)
 {
+
 	if (strcmp(param, "engineSettings_NumBuckets") == 0)
 	{
+#ifdef GTA_FIVE
 		out = 12 + kExtraAudioBuckets;
+#elif IS_RDR3
+		out = 8 + kExtraAudioBuckets;
+#endif
 		return true;
 	}
 
@@ -2092,7 +2172,7 @@ static HookFunction hookFunction([]()
 #ifdef GTA_FIVE
 		auto location = hook::get_call(hook::get_pattern("41 B8 00 00 01 00 84 C0 48", -12));
 #elif IS_RDR3
-		auto location = hook::get_pattern("41 B8 ? ? ? ? 44 0F 45 44 24", -0x15);
+		auto location = hook::get_call(hook::get_pattern("41 B8 ? ? ? ? 44 0F 45 44 24", -0x15));
 #endif
 		MH_Initialize();
 		MH_CreateHook(location, audConfig_GetData_uint, (void**)&g_orig_audConfig_GetData_uint);
@@ -2119,44 +2199,33 @@ static HookFunction hookFunction([]()
 			{
 #ifdef GTA_FIVE
 				test(byte_ptr[rdi + 247], 0x10); // if ((rdi+247) & 0x10) {
-#elif IS_RDR3
-				test(byte_ptr[rdi + 587], 1);
-#endif
 				jz("unsure");
 				L("sure"); // sure:
-#ifdef GTA_FIVE
 				mov(eax, dword_ptr[rdi + 216]); //    eax = (rdi + 216)
 				cmp(eax, 0x1C); //    if (eax >= 0x1C) {
-#elif IS_RDR3
-				mov(eax, dword_ptr[rdi + 536]);
-				cmp(eax, 0x14);
-#endif
 				jl("go");
-#ifdef GTA_FIVE
 				and(byte_ptr[rdi + 247], ~0x10); //       (rdi + 247) &= ~0x10
 				or (byte_ptr[rdi + 248], 0x80); //       (rdi + 248) |=  0x80
-#elif IS_RDR3
-				and(byte_ptr[rdi + 587], ~0x1);
-				or (byte_ptr[rdi + 588], 0x80);
-#endif
 				jmp("go"); //    }
 				L("unsure"); // } else {
-#ifdef GTA_FIVE
 				test(byte_ptr[rdi + 248], 0x80); //    if ((rdi+248) & 0x80) {
-#elif IS_RDR3
-				test(byte_ptr[rdi + 588], 0x80);
-#endif
 				jnz("sure"); //        goto sure;
 							 //    }
 				mov(eax, 0xFFFFFFFF); //    eax = -1;
 				L("go"); // }
-#ifdef GTA_FIVE
 				mov(byte_ptr[rdx + 0x6A], al); // (rdx + 0x6A) = eax
-#elif IS_RDR3
-				mov(byte_ptr[rdx + 0x148], al); // (rdx + 0x6A) = eax
-#endif
 				mov(rax, (uint64_t)origCall); // return to sender
 				jmp(rax);
+#elif IS_RDR3
+				mov(eax, dword_ptr[rdi + 0x218]);
+				cmp(eax, 14);
+				jge("go");
+				mov(eax, 0xFFFFFFFF);
+				L("go");
+				mov(byte_ptr[rdx + 0x148], al);
+				mov(rax, (uint64_t)origCall);
+				jmp(rax);
+#endif
 			}
 		} updateVoiceMetricsStub;
 
@@ -2171,29 +2240,33 @@ static HookFunction hookFunction([]()
 		{
 			virtual void InternalMain() override
 			{
-				sub(rsp, 0x28);
 #ifdef GTA_FIVE
+				sub(rsp, 0x28);
 				mov(rcx, qword_ptr[rsi]);
 				lea(rdx, qword_ptr[rsp + 0x30 + 0x20]);
-#elif IS_RDR3
-				mov(rcx, qword_ptr[r15]);
-				lea(rdx, qword_ptr[rsp + 0x30 + 0xB0]);
-#endif
 
 				mov(rax, (uint64_t)DoVoiceRoute);
 				call(rax);
 
 				add(rsp, 0x28);
 
-#ifdef GTA_FIVE
 				mov(rdi, rbx);
 				mov(r13, rbx);
-#elif IS_RDR3
-				mov(rdi, r14);
-				mov(bl, 0x7F);
-#endif
 
 				ret();
+#elif IS_RDR3
+				push(r14);
+				sub(rsp, 0x28);
+				mov(rcx, qword_ptr[r15]);
+				lea(rdx, qword_ptr[rsp + 0x28 + 0x8 + 0xB0]);
+				mov(rax, (uint64_t)DoVoiceRoute);
+				call(rax);
+				add(rsp, 0x28);
+				pop(r14);
+				mov(rdi, r14);
+				mov(bl, 0x7F);
+				ret();
+#endif
 			}
 
 			static void DoVoiceRoute(uint8_t* voiceData, int* outRoutes)
@@ -2204,7 +2277,7 @@ static HookFunction hookFunction([]()
 					outRoutes[0] = voiceData[0x6A];
 				}
 #elif IS_RDR3
-				if (voiceData[0x148] != 0xFF && voiceData[0x148] >= 0x14) // first route we have 'ourselves'
+				if (voiceData[0x148] != 0xFF && voiceData[0x148] >= 14) // first route we have 'ourselves'
 				{
 					outRoutes[0] = voiceData[0x148];
 					outRoutes[1] = outRoutes[2] = outRoutes[3] = outRoutes[4] = outRoutes[5] = 0xFF;
@@ -2227,13 +2300,12 @@ static HookFunction hookFunction([]()
 #ifdef GTA_FIVE
 		auto location = hook::get_pattern<char>("48 8B CB C7 44 24 28 58 CB 00 00 44 88 74 24 20 E8", -0x2C4);
 		hook::set_call(&g_origOddFunc, location + 0x2D4);
-#elif IS_RDR3
 		auto location = hook::get_pattern<char>("66 85 C0 74 2C BA ? ? ? ? 48", -0x53);
-#endif
 
 		MH_Initialize();
 		MH_CreateHook(location, audEnvironmentSound_InitStub, (void**)&g_origaudEnvironmentSound_Init);
 		MH_EnableHook(location);
+#endif
 	}
 
 	// triple audio command buffer size
@@ -2268,6 +2340,13 @@ rage::audDspEffect* MakeRadioFX();
 
 static InitFunction initFunction([]()
 {
+#if IS_RDR3
+	fx::ScriptEngine::RegisterNativeHandler("GET_ENTITY_ADDRESS", [](fx::ScriptContext& context)
+	{
+		context.SetResult(rage::fwScriptGuid::GetBaseFromGuid(context.GetArgument<int>(0)));
+	});
+#endif
+
 	fx::ScriptEngine::RegisterNativeHandler("CREATE_AUDIO_SUBMIX", [](fx::ScriptContext& ctx)
 	{
 		std::string name = ctx.CheckArgument<const char*>(0);
@@ -2459,10 +2538,9 @@ static InitFunction initFunction([]()
 	{
 		netLibrary = lib;
 	});
-
+#ifdef GTA_FIVE
 	OnGameFrame.Connect([]()
 	{
-#ifdef GTA_FIVE
 		static ConVar<bool> arenaWarVariable("ui_disableMusicTheme", ConVar_Archive, false);
 		static ConVar<bool> arenaWarVariableForce("ui_forceMusicTheme", ConVar_Archive, false);
 		static ConVar<std::string> musicThemeVariable("ui_selectMusic", ConVar_Archive, "dlc_awxm2018_theme_5_stems");
@@ -2603,8 +2681,8 @@ static InitFunction initFunction([]()
 				swapSong = false;
 			}
 		}
-#endif
 	});
+#endif
 
 	OnMainGameFrame.Connect([]()
 	{
