@@ -39,1112 +39,1099 @@ static concurrency::concurrent_queue<std::function<void()>> g_mainQueue;
 
 namespace rage
 {
-class audCurve
-{
-public:
-	// input: units of distance
-	// output: attenuation in dB from -100 to 0
-	static float DefaultDistanceAttenuation_CalculateValue(float x);
-};
-
-static hook::cdecl_stub<float(float)> _audCurve_DefaultDistanceAttenuation_CalculateValue([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("0F 28 C8 F3 0F 59 08 48 83 C0 04", -0x38);
-#elif IS_RDR3
-	return hook::get_pattern("0F 28 D8 0F 28 D0 F3 0F 5C 1D ? ? ? ? F3", -0xF);
-#endif
-});
-
-float audCurve::DefaultDistanceAttenuation_CalculateValue(float x)
-{
-	return _audCurve_DefaultDistanceAttenuation_CalculateValue(x);
-}
-
-class audWaveSlot
-{
-public:
-	static audWaveSlot* FindWaveSlot(uint32_t hash);
-};
-
-class audChannelVoiceVolumes
-{
-public:
-	alignas(16) float volumes[6];
-
-	audChannelVoiceVolumes()
+	class audCurve
 	{
-		memset(volumes, 0, sizeof(volumes));
+	public:
+		// input: units of distance
+		// output: attenuation in dB from -100 to 0
+		static float DefaultDistanceAttenuation_CalculateValue(float x);
+	};
+
+	static hook::cdecl_stub<float(float)> _audCurve_DefaultDistanceAttenuation_CalculateValue([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("0F 28 C8 F3 0F 59 08 48 83 C0 04", -0x38);
+#elif IS_RDR3
+		return hook::get_pattern("0F 28 D8 0F 28 D0 F3 0F 5C 1D ? ? ? ? F3", -0xF);
+#endif
+	});
+
+	float audCurve::DefaultDistanceAttenuation_CalculateValue(float x)
+	{
+		return _audCurve_DefaultDistanceAttenuation_CalculateValue(x);
 	}
-};
 
-class audMixerSubmix
-{
-public:
-	void AddOutput(uint32_t output, bool a2, bool a3);
-	void SetEffect(int slot, audDspEffect* effect, uint32_t mask = 0xF);
-	void SetFlag(int id, bool value);
-	void SetEffectParam(int slot, uint32_t hash, uint32_t value);
-	void SetEffectParam(int slot, uint32_t hash, float value);
-	void SetOutputVolumes(uint32_t slot, const audChannelVoiceVolumes& volumes);
-};
-
-static hook::thiscall_stub<void(audMixerSubmix* self, uint32_t output, bool a2, bool a3)> _audMixerSubmix_AddOutput([]
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("44 88 4C 24 29 0D 28 00 00 03", -0x1B);
-#elif IS_RDR3
-	return hook::get_pattern("89 44 24 20 44 88 4C 24 ? E8 ? ? ? ? 48 83 C4 38", -0x20);
-#endif
-});
-
-static hook::thiscall_stub<void(audMixerSubmix* self, int slot, audDspEffect* effect, uint32_t mask)> _audMixerSubmix_SetEffect([]
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("0D 08 00 00 06 89 44 24 20", -0x20);
-#elif IS_RDR3
-	return hook::get_pattern("0D ? ? ? ? 4C 89 44 24 ? 48 8D 54 24 ? 89 44 24 20", -0x11);
-#endif
-});
-
-static hook::thiscall_stub<void(audMixerSubmix* self, int slot, uint32_t hash, uint32_t value)> _audMixerSubmix_SetEffectParam_int([]
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("44 89 44 24 24 44 89 4C 24 28 0D 10 00 00", -0x16);
-#elif IS_RDR3
-	return hook::get_pattern("88 54 24 2C 0D ? ? ? ? 44 89 44 24 ? 48 8D 54 24 ? 89 44 24 20", -0xD);
-#endif
-});
-
-static hook::thiscall_stub<void(audMixerSubmix* self, int slot, uint32_t hash, float value)> _audMixerSubmix_SetEffectParam_float([]
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("F3 0F 11 5C 24 28 25 07 F8 3F 00 44 89", -0x11);
-#elif IS_RDR3
-	return hook::get_pattern("F3 0F 11 5C 24 ? 48 8D 54 24 ? 89 44 24 20 44 89 44 24 ? E8", -0x16);
-#endif
-});
-
-static hook::thiscall_stub<void(audMixerSubmix* self, int id, bool value)> _audMixerSubmix_SetFlag([]
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("0D 20 00 00 03 89 44 24 20", -0x1B);
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? BB ? ? ? ? 41 B0 01"));
-#endif
-});
-
-static hook::thiscall_stub<void(audMixerSubmix* self, uint32_t slot, const audChannelVoiceVolumes& volumes)> _audMixerSubmix_SetOutputVolumes([]
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("25 07 F8 3F 00 89 54 24 24 48 8D", -0x11);
-#elif IS_RDR3
-	return hook::get_pattern("0F C6 CA E8 89 54 24 24 48 8D 54 24 ? 0F 29 4C 24 ? 89 44 24 20", -0x42);
-#endif
-});
-
-void audMixerSubmix::AddOutput(uint32_t output, bool a2, bool a3)
-{
-	return _audMixerSubmix_AddOutput(this, output, a2, a3);
-}
-
-void audMixerSubmix::SetEffect(int slot, audDspEffect* effect, uint32_t mask /* = 0xF */)
-{
-	return _audMixerSubmix_SetEffect(this, slot, effect, mask);
-}
-
-void audMixerSubmix::SetEffectParam(int slot, uint32_t hash, float value)
-{
-	return _audMixerSubmix_SetEffectParam_float(this, slot, hash, value);
-}
-
-void audMixerSubmix::SetEffectParam(int slot, uint32_t hash, uint32_t value)
-{
-	return _audMixerSubmix_SetEffectParam_int(this, slot, hash, value);
-}
-
-void audMixerSubmix::SetFlag(int id, bool value)
-{
-	return _audMixerSubmix_SetFlag(this, id, value);
-}
-
-void audMixerSubmix::SetOutputVolumes(uint32_t slot, const audChannelVoiceVolumes& volumes)
-{
-	return _audMixerSubmix_SetOutputVolumes(this, slot, volumes);
-}
-
-class audMixerDevice
-{
-public:
-	audMixerSubmix* CreateSubmix(const char* name, int numOutputChannels, bool a3);
-	uint8_t GetSubmixIndex(audMixerSubmix* submix);
-	void ComputeProcessingGraph();
-	void FlagThreadCommandBufferReadyToProcess(uint32_t a1 = 0);
-	void InitClientThread(const char* name, uint32_t bufferSize);
-
-	inline audMixerSubmix* GetSubmix(int idx)
+	class audWaveSlot
 	{
-		if (idx < 0 || idx >= 40)
+	public:
+		static audWaveSlot* FindWaveSlot(uint32_t hash);
+	};
+
+	class audChannelVoiceVolumes
+	{
+	public:
+		alignas(16) float volumes[6];
+
+		audChannelVoiceVolumes()
+		{
+			memset(volumes, 0, sizeof(volumes));
+		}
+	};
+
+	class audMixerSubmix
+	{
+	public:
+		void AddOutput(uint32_t output, bool a2, bool a3);
+		void SetEffect(int slot, audDspEffect* effect, uint32_t mask = 0xF);
+		void SetFlag(int id, bool value);
+		void SetEffectParam(int slot, uint32_t hash, uint32_t value);
+		void SetEffectParam(int slot, uint32_t hash, float value);
+		void SetOutputVolumes(uint32_t slot, const audChannelVoiceVolumes& volumes);
+	};
+
+	static hook::thiscall_stub<void(audMixerSubmix* self, uint32_t output, bool a2, bool a3)> _audMixerSubmix_AddOutput([]
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("44 88 4C 24 29 0D 28 00 00 03", -0x1B);
+#elif IS_RDR3
+		return hook::get_pattern("89 44 24 20 44 88 4C 24 ? E8 ? ? ? ? 48 83 C4 38", -0x20);
+#endif
+	});
+
+	static hook::thiscall_stub<void(audMixerSubmix* self, int slot, audDspEffect* effect, uint32_t mask)> _audMixerSubmix_SetEffect([]
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("0D 08 00 00 06 89 44 24 20", -0x20);
+#elif IS_RDR3
+		return hook::get_pattern("0D ? ? ? ? 4C 89 44 24 ? 48 8D 54 24 ? 89 44 24 20", -0x11);
+#endif
+	});
+
+	static hook::thiscall_stub<void(audMixerSubmix* self, int slot, uint32_t hash, uint32_t value)> _audMixerSubmix_SetEffectParam_int([]
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("44 89 44 24 24 44 89 4C 24 28 0D 10 00 00", -0x16);
+#elif IS_RDR3
+		return hook::get_pattern("88 54 24 2C 0D ? ? ? ? 44 89 44 24 ? 48 8D 54 24 ? 89 44 24 20", -0xD);
+#endif
+	});
+
+	static hook::thiscall_stub<void(audMixerSubmix* self, int slot, uint32_t hash, float value)> _audMixerSubmix_SetEffectParam_float([]
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("F3 0F 11 5C 24 28 25 07 F8 3F 00 44 89", -0x11);
+#elif IS_RDR3
+		return hook::get_pattern("F3 0F 11 5C 24 ? 48 8D 54 24 ? 89 44 24 20 44 89 44 24 ? E8", -0x16);
+#endif
+	});
+
+	static hook::thiscall_stub<void(audMixerSubmix* self, int id, bool value)> _audMixerSubmix_SetFlag([]
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("0D 20 00 00 03 89 44 24 20", -0x1B);
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? BB ? ? ? ? 41 B0 01"));
+#endif
+	});
+
+	static hook::thiscall_stub<void(audMixerSubmix* self, uint32_t slot, const audChannelVoiceVolumes& volumes)> _audMixerSubmix_SetOutputVolumes([]
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("25 07 F8 3F 00 89 54 24 24 48 8D", -0x11);
+#elif IS_RDR3
+		return hook::get_pattern("0F C6 CA E8 89 54 24 24 48 8D 54 24 ? 0F 29 4C 24 ? 89 44 24 20", -0x42);
+#endif
+	});
+
+	void audMixerSubmix::AddOutput(uint32_t output, bool a2, bool a3)
+	{
+		return _audMixerSubmix_AddOutput(this, output, a2, a3);
+	}
+
+	void audMixerSubmix::SetEffect(int slot, audDspEffect* effect, uint32_t mask /* = 0xF */)
+	{
+		return _audMixerSubmix_SetEffect(this, slot, effect, mask);
+	}
+
+	void audMixerSubmix::SetEffectParam(int slot, uint32_t hash, float value)
+	{
+		return _audMixerSubmix_SetEffectParam_float(this, slot, hash, value);
+	}
+
+	void audMixerSubmix::SetEffectParam(int slot, uint32_t hash, uint32_t value)
+	{
+		return _audMixerSubmix_SetEffectParam_int(this, slot, hash, value);
+	}
+
+	void audMixerSubmix::SetFlag(int id, bool value)
+	{
+		return _audMixerSubmix_SetFlag(this, id, value);
+	}
+
+	void audMixerSubmix::SetOutputVolumes(uint32_t slot, const audChannelVoiceVolumes& volumes)
+	{
+		return _audMixerSubmix_SetOutputVolumes(this, slot, volumes);
+	}
+
+	class audMixerDevice
+	{
+	public:
+		audMixerSubmix* CreateSubmix(const char* name, int numOutputChannels, bool a3);
+		uint8_t GetSubmixIndex(audMixerSubmix* submix);
+		void ComputeProcessingGraph();
+		void FlagThreadCommandBufferReadyToProcess(uint32_t a1 = 0);
+		void InitClientThread(const char* name, uint32_t bufferSize);
+
+		inline audMixerSubmix* GetSubmix(int idx)
+		{
+			if (idx < 0 || idx >= 40)
+			{
+				return nullptr;
+			}
+
+			return (audMixerSubmix*)m_submixes[idx];
+		}
+
+	private:
+		virtual ~audMixerDevice() = 0;
+
+		uint64_t m_8;
+#ifdef GTA_FIVE
+		uint8_t m_submixes[40][256];
+#elif IS_RDR3
+		uint8_t m_submixes[40][368];
+#endif
+		uint32_t m_numSubmixes;
+	};
+
+	static hook::thiscall_stub<audMixerSubmix*(audMixerDevice* self, const char* name, int numOutputChannels, bool a3)> _audMixerDevice_CreateSubmix([]
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("48 C1 E3 08 89 82 00 28 00", -0x17);
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? 48 63 8F ? ? ? ? 48 8B D0"));
+#endif
+	});
+#ifdef GTA_FIVE
+	static hook::thiscall_stub<uint8_t(audMixerDevice* self, audMixerSubmix* submix)> _audMixerDevice_GetSubmixIndex([]
+	{
+		return hook::get_pattern("83 C8 FF C3 48 2B D1", -0x5);
+	});
+
+	static hook::thiscall_stub<void(audMixerDevice* self)> _audMixerDevice_ComputeProcessingGraph([]
+	{
+		return hook::get_pattern("48 63 83 00 28 00 00 48 8B CB 41 BD", -0x28);
+	});
+#endif
+	static hook::thiscall_stub<void(audMixerDevice* self, uint32_t)> _audMixerDevice_FlagThreadCommandBufferReadyToProcess([]
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("48 8B 81 68 F2 00 00 4E 8B", -0x25);
+#elif IS_RDR3
+		return hook::get_pattern("41 8B 81 ? ? ? ? 48 8D 14 40 48 03 D2 45 89 54 D1 ? 41", -0x30);
+#endif
+	});
+
+	static hook::thiscall_stub<void(audMixerDevice* self, const char*, uint32_t)> _audMixerDevice_InitClientThread([]
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("B9 B0 00 00 00 45 8B F0 48 8B FA E8", -0x1C);
+#elif IS_RDR3
+		return hook::get_pattern("48 89 48 DC 89 48 E4", -0x45);
+#endif
+	});
+
+	audMixerSubmix* audMixerDevice::CreateSubmix(const char* name, int numOutputChannels, bool a3)
+	{
+		return _audMixerDevice_CreateSubmix(this, name, numOutputChannels, a3);
+	}
+
+	uint8_t audMixerDevice::GetSubmixIndex(audMixerSubmix* submix)
+	{
+#ifdef GTA_FIVE
+		return _audMixerDevice_GetSubmixIndex(this, submix);
+#elif IS_RDR3
+		if (!submix)
+		{
+			return -1;
+		}
+
+		return *reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(submix) + 0x150);
+#endif
+	}
+
+#ifdef GTA_FIVE
+	void audMixerDevice::ComputeProcessingGraph()
+	{
+		return _audMixerDevice_ComputeProcessingGraph(this);
+	}
+#endif
+	void audMixerDevice::FlagThreadCommandBufferReadyToProcess(uint32_t a1 /* = 0 */)
+	{
+		return _audMixerDevice_FlagThreadCommandBufferReadyToProcess(this, a1);
+	}
+
+	void audMixerDevice::InitClientThread(const char* name, uint32_t bufferSize)
+	{
+		return _audMixerDevice_InitClientThread(this, name, bufferSize);
+	}
+
+	class audDriver
+	{
+	public:
+		inline static audMixerDevice* GetMixer()
+		{
+			return *sm_Mixer;
+		}
+
+	public:
+		static audMixerDevice** sm_Mixer;
+	};
+
+	class audRequestedSettings;
+
+	class audSound
+	{
+	public:
+#ifdef GTA_FIVE
+		virtual ~audSound() = 0;
+
+		virtual void m_8() = 0;
+
+		virtual void m_10() = 0;
+
+		virtual void m_18() = 0;
+
+		virtual void Init() = 0;
+
+		virtual void m_28() = 0;
+#elif IS_RDR3
+		virtual bool FindAndSetVariableValueWrapper(void) = 0;
+
+		virtual bool FindAndSetVariableValue(void) = 0;
+
+		virtual bool FindAndSetVariableHashValue(void) = 0;
+
+		virtual void throw__0x52D76AA0_01() = 0;
+
+		virtual uint64_t Pause(uint32_t unk) = 0;
+
+		virtual uint64_t FindVariableDownHierarchy(uint32_t, uint32_t) = 0;
+
+		virtual uint64_t FindVariableUpHierarchy(uint32_t, bool) = 0;
+
+		virtual ~audSound() = 0;
+
+		virtual uint64_t Init(const class audSoundInternalInitParams*, class audSoundScratchInitParams*, void*) = 0;
+
+		virtual void throw__0x52D76AA0_02() = 0;
+
+		virtual void throw__0x52D76AA0_03() = 0;
+
+		virtual void throw__0x52D76AA0_04() = 0;
+
+		virtual void throw__0x52D76AA0_05() = 0;
+
+		virtual uint64_t ActionReleaseRequest(uint32_t) = 0;
+#endif
+
+		void PrepareAndPlay(audWaveSlot* waveSlot, bool a2, int a3, bool a4);
+
+		void StopAndForget(bool a1);
+
+		audRequestedSettings* GetRequestedSettings();
+
+	public:
+#ifdef GTA_FIVE
+		char pad[141 - 8];
+		uint8_t unkBitFlag : 3;
+#elif IS_RDR3
+		char pad_0008[152];
+		uint8_t bucketID;
+		char pad_00A1[53];
+		uint16_t settingsID;
+#endif
+	};
+
+	static hook::cdecl_stub<void(audSound*, void*, bool, int, bool)> _audSound_PrepareAndPlay([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("0F 85 ? 00 00 00 41 83 CB FF 45 33 C0", -0x35);
+#elif IS_RDR3
+		return hook::get_pattern("48 83 EC 20 33 DB 41 8B F9 45 8A F0", -0x15);
+#endif
+	});
+
+	static hook::cdecl_stub<void(audSound*, bool)> _audSound_StopAndForget([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("74 24 45 0F B6 41 62", -0x10);
+#elif IS_RDR3
+		return hook::get_pattern("88 91 ? ? ? ? 8A C2 4D 8B 41 58", -0x52);
+#endif
+	});
+
+	void audSound::PrepareAndPlay(audWaveSlot* a1, bool a2, int a3, bool a4)
+	{
+		_audSound_PrepareAndPlay(this, a1, a2, a3, a4);
+	}
+
+	void audSound::StopAndForget(bool a1)
+	{
+		_audSound_StopAndForget(this, a1);
+	}
+
+	class audReferencedRingBuffer : public sysUseAllocator
+	{
+	public:
+		audReferencedRingBuffer();
+
+	private:
+		~audReferencedRingBuffer();
+
+	public:
+		inline void SetBuffer(void* buffer, uint32_t size)
+		{
+			m_data = buffer;
+			m_size = size;
+			m_initialized = true;
+		}
+
+		uint32_t PushAudio(const void* data, uint32_t size);
+
+		inline void Release()
+		{
+			if (InterlockedDecrement(&m_usageCount) == 0)
+			{
+				delete this;
+			}
+		}
+
+		int GetCustomMode();
+		void SetCustomMode(int idx);
+
+	private:
+		void* m_data; // +0
+		uint32_t m_size; // +8
+		uint32_t m_fC; // +12
+		uint32_t m_f10_0; // +16
+		uint32_t m_f14_0; // +20
+		uint32_t m_f18_0; // +24
+		uint32_t m_pad_f1C; // +28
+		CRITICAL_SECTION m_lock; // +32
+		bool m_f48_0; // +72
+		bool m_initialized; // +73
+		uint8_t m_pad_f4A[6]; // +74
+		uint32_t m_usageCount; // +80
+		uint32_t m_f54; // +84
+	};
+
+	audReferencedRingBuffer::audReferencedRingBuffer()
+	{
+		m_data = nullptr;
+		m_size = 0;
+
+		m_f10_0 = 0;
+		m_f14_0 = 0;
+		m_f18_0 = 0;
+		m_f48_0 = false;
+		m_initialized = false;
+
+		m_usageCount = 1;
+
+		InitializeCriticalSectionAndSpinCount(&m_lock, 1000);
+	}
+
+	audReferencedRingBuffer::~audReferencedRingBuffer()
+	{
+		if (m_data)
+		{
+			rage::GetAllocator()->Free(m_data);
+			m_data = nullptr;
+		}
+
+		DeleteCriticalSection(&m_lock);
+	}
+
+	int audReferencedRingBuffer::GetCustomMode()
+	{
+		if (m_pad_f1C == 0xBEEFCA3E)
+		{
+			return *(int*)&m_pad_f4A[0];
+		}
+
+		return -1;
+	}
+
+	void audReferencedRingBuffer::SetCustomMode(int idx)
+	{
+		m_pad_f1C = 0xBEEFCA3E;
+		*(int*)&m_pad_f4A[0] = idx;
+	}
+
+	static hook::cdecl_stub<uint32_t(audReferencedRingBuffer*, const void*, uint32_t)> _audReferencedRingBuffer_PushAudio([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("8B 71 08 48 8B 29 2B F0 48 8B D9 41 8B", -0x1B);
+#elif IS_RDR3
+		return hook::get_pattern("44 8B 49 14 41 8B F8 8B 41 08 41 8B C9", -0x28);
+#endif
+	});
+
+	uint32_t audReferencedRingBuffer::PushAudio(const void* data, uint32_t size)
+	{
+		return _audReferencedRingBuffer_PushAudio(this, data, size);
+	}
+
+	class audExternalStreamSound : public rage::audSound
+	{
+	public:
+		bool InitStreamPlayer(rage::audReferencedRingBuffer* buffer, int channels, int frequency);
+	};
+
+	static hook::cdecl_stub<bool(rage::audExternalStreamSound*, rage::audReferencedRingBuffer*, int, int)> _audExternalStreamSound_InitStreamPlayer([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("F0 FF 42 50 48 89 11 44 89 41", -0x2A);
+#elif IS_RDR3
+		return hook::get_pattern("49 03 8C 02 ? ? ? ? 74 12", -0x23);
+#endif
+	});
+
+	bool audExternalStreamSound::InitStreamPlayer(rage::audReferencedRingBuffer* buffer, int channels, int frequency)
+	{
+		return _audExternalStreamSound_InitStreamPlayer(this, buffer, channels, frequency);
+	}
+
+	class audCategory
+	{
+
+	};
+
+	class audCategoryManager
+	{
+	public:
+		rage::audCategory* GetCategoryPtr(uint32_t category);
+	};
+
+	static hook::cdecl_stub<rage::audCategory*(rage::audCategoryManager*, uint32_t)> _audCategoryManager_GetCategoryPtr([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_call(hook::get_pattern("48 8B CB BA EA 75 96 D5 E8", 8));
+#elif IS_RDR3
+		return hook::get_pattern("43 8D 04 08 99 2B C2 D1 F8 8B D0 8B C8 48 03 C0", -0x2C);
+#endif
+	});
+
+	rage::audCategory* audCategoryManager::GetCategoryPtr(uint32_t category)
+	{
+		return _audCategoryManager_GetCategoryPtr(this, category);
+	}
+
+	struct Vec3V
+	{
+		float x;
+		float y;
+		float z;
+		float pad;
+	};
+
+	struct audOrientation
+	{
+		float x;
+		float y;
+	};
+
+	class audTracker
+	{
+	public:
+		virtual ~audTracker() = default;
+
+		virtual rage::Vec3V GetPosition()
+		{
+			return { 0.f, 0.f, 0.f, 0.f };
+		}
+
+		virtual rage::audOrientation GetOrientation()
+		{
+			return { 0.f, 0.f };
+		}
+	};
+
+	class audEnvironmentGroupInterface
+	{
+	public:
+		virtual ~audEnvironmentGroupInterface() = 0;
+	};
+
+	class audSoundInitParams
+	{
+	public:
+		audSoundInitParams();
+
+		void SetCategory(rage::audCategory* category);
+
+		void SetEnvironmentGroup(rage::audEnvironmentGroupInterface* environmentGroup);
+
+		void SetVolume(float volume);
+
+		void SetPositional(bool positional);
+
+		void SetTracker(audTracker* parent);
+
+		void SetPosition(float x, float y, float z);
+
+		void SetSubmixIndex(uint8_t index);
+
+		void SetUnk();
+
+		void SetAllocationBucket(uint8_t bucket);
+
+	private:
+#ifdef GTA_FIVE
+		uint8_t m_pad[0xB0];
+#elif IS_RDR3
+		uint8_t m_pad[0x150];
+#endif
+	};
+
+	void audSoundInitParams::SetCategory(rage::audCategory* category)
+	{
+#ifdef GTA_FIVE
+		*(audCategory**)(&m_pad[88]) = category;
+#elif IS_RDR3
+		*(audCategory**)(&m_pad[216]) = category;
+#endif
+	}
+
+	void audSoundInitParams::SetEnvironmentGroup(rage::audEnvironmentGroupInterface* environmentGroup)
+	{
+#ifdef GTA_FIVE
+		*(audEnvironmentGroupInterface**)(&m_pad[96]) = environmentGroup;
+#elif IS_RDR3
+		*(audEnvironmentGroupInterface**)(&m_pad[224]) = environmentGroup;
+#endif
+	}
+
+	void audSoundInitParams::SetPosition(float x, float y, float z)
+	{
+		auto f = (float*)m_pad;
+
+		f[0] = x;
+		f[1] = y;
+		f[2] = z;
+		f[3] = 0.f;
+	}
+
+	void audSoundInitParams::SetVolume(float volume)
+	{
+#ifdef GTA_FIVE
+		*(float*)(&m_pad[48]) = volume;
+#elif IS_RDR3
+		*(float*)(&m_pad[164]) = volume;
+#endif
+	}
+
+	void audSoundInitParams::SetTracker(audTracker* parent)
+	{
+#ifdef GTA_FIVE
+		*(audTracker**)(&m_pad[72]) = parent;
+#elif IS_RDR3
+		*(audTracker**)(&m_pad[200]) = parent;
+#endif
+	}
+
+	void audSoundInitParams::SetPositional(bool positional)
+	{
+#ifdef GTA_FIVE
+		if (positional)
+		{
+			m_pad[158] |= 1;
+		}
+		else
+		{
+			m_pad[158] &= ~1;
+		}
+#elif IS_RDR3
+		if (positional)
+		{
+			m_pad[315] |= 1;
+		}
+		else
+		{
+			m_pad[315] &= ~1;
+		}
+#endif
+	}
+
+	void audSoundInitParams::SetSubmixIndex(uint8_t submix)
+	{
+#ifdef GTA_FIVE
+		m_pad[155] = (submix - 0x1C) | 0x20;
+		// this field does really weird stuff in game
+		//*(uint8_t*)(&m_pad[0x98]) = submix;
+		//*(uint16_t*)(&m_pad[0x9B]) = 3;
+#elif IS_RDR3
+		*(uint16_t*)(&m_pad[0x134]) = (uint16_t)(submix);
+#endif
+	}
+#ifdef GTA_FIVE
+	void audSoundInitParams::SetUnk()
+	{
+		m_pad[155] = 27;
+	}
+#endif
+	void audSoundInitParams::SetAllocationBucket(uint8_t bucket)
+	{
+#ifdef GTA_FIVE
+		m_pad[154] = bucket;
+#elif IS_RDR3
+		m_pad[310] = bucket;
+#endif
+	}
+
+	static hook::cdecl_stub<void(rage::audSoundInitParams*)> _audSoundInitParams_ctor([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("0F 57 C0 48 8D 41 10 BA 03 00 00 00");
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? 8A 45 7A"));
+#endif
+	});
+
+	static uint8_t* initParamVal;
+
+	audSoundInitParams::audSoundInitParams()
+	{
+		_audSoundInitParams_ctor(this);
+
+		SetAllocationBucket(*initParamVal);
+	}
+
+	class audRequestedSettings
+	{
+	public:
+		void SetQuadSpeakerLevels(float levels[4]);
+
+		void SetVolume(float vol);
+
+		void SetVolumeCurveScale(float sca);
+
+		void SetEnvironmentalLoudness(uint8_t val);
+
+		void SetSourceEffectMix(float wet, float dry);
+	};
+
+	static hook::thiscall_stub<void(audRequestedSettings*, float)> _audRequestedSettings_SetVolume([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("F3 0F 11 8C D1 90 00 00 00", -0x11);
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? F3 44 0F 58 4E"));
+#endif
+	});
+
+	static hook::thiscall_stub<void(audRequestedSettings*, float)> _audRequestedSettings_SetVolumeCurveScale([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("F3 0F 11 8C D1 A8 00 00 00", -0x11);
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? 38 5E 6C"));
+#endif
+	});
+
+	static hook::thiscall_stub<void(audRequestedSettings*, uint8_t)> _audRequestedSettings_SetEnvironmentalLoudness([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("42 88 94 C1 B1 00 00 00", -0x11);
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? C7 87 ? ? ? ? ? ? ? ? 48 8B 83 ? ? ? ? 48 85 C0 74 52"));
+#endif
+	});
+
+	static hook::thiscall_stub<void(audRequestedSettings*, uint8_t)> _audRequestedSettings_SetSpeakerMask([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("42 88 94 C1 B0 00 00 00", -0x11);
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? 44 8A 86 ? ? ? ? 48 8B CF"));
+#endif
+	});
+
+	static hook::thiscall_stub<void(audRequestedSettings*, float, float)> _audRequestedSettings_SetSourceEffectMix([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("F3 0F 11 8C D1 98 00 00 00", -0x11);
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? F3 0F 10 0D ? ? ? ? 49 8B CF F3 0F 58 4E"));
+#endif
+	});
+
+	static hook::thiscall_stub<void(audRequestedSettings*, float[4])> _audRequestedSettings_SetQuadSpeakerLevels([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_pattern("B8 00 80 00 00 66 09 84", -0x61);
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? 40 8A B5 ? ? ? ? 40 80 FE 01"));
+#endif
+	});
+
+	void audRequestedSettings::SetVolume(float vol)
+	{
+		_audRequestedSettings_SetVolume(this, vol);
+	}
+
+	void audRequestedSettings::SetQuadSpeakerLevels(float levels[4])
+	{
+		_audRequestedSettings_SetQuadSpeakerLevels(this, levels);
+	}
+
+	void audRequestedSettings::SetVolumeCurveScale(float vol)
+	{
+		_audRequestedSettings_SetVolumeCurveScale(this, vol);
+	}
+
+	void audRequestedSettings::SetEnvironmentalLoudness(uint8_t vol)
+	{
+		_audRequestedSettings_SetEnvironmentalLoudness(this, vol);
+	}
+
+	void audRequestedSettings::SetSourceEffectMix(float wet, float dry)
+	{
+		_audRequestedSettings_SetSourceEffectMix(this, wet, dry);
+	}
+
+	class audEntity
+	{
+	public:
+		audEntity();
+
+		virtual ~audEntity();
+#if IS_RDR3
+		virtual void unk_0x8()
+		{
+		}
+#endif
+		virtual void Init();
+
+		virtual void Shutdown();
+
+		virtual void StopAllSounds(bool);
+
+		virtual void PreUpdateService(uint32_t)
+		{
+		
+		}
+#if IS_RDR3
+		virtual void PreUpdateServiceInternal(uint32_t a1)
+		{
+
+		}
+#endif
+		virtual void PostUpdate()
+		{
+
+		}
+
+		virtual void UpdateSound(rage::audSound*, rage::audRequestedSettings*, uint32_t)
+		{
+
+		}
+#if IS_RDR3
+		virtual bool HasPendingAnimEvents()
+		{
+			return false;
+		}
+
+		virtual bool HasPendingDeferredSounds()
+		{
+			return false;
+		}
+
+		virtual void unk_0x58()
+		{
+
+		}
+#endif
+		virtual bool IsUnpausable()
+		{
+			return false;
+		}
+
+		virtual uint32_t QuerySoundNameFromObjectAndField(const uint32_t*, uint32_t, const rage::audSound*)
+		{
+			return 0;
+		}
+
+		virtual void QuerySpeechVoiceAndContextFromField(uint32_t, uint32_t&, uint32_t&)
+		{
+
+		}
+#if IS_RDR3
+		virtual uint64_t GetEnvironmentGroup(bool a1)
+		{
+			return 0;
+		}
+
+		virtual uint64_t GetEnvironmentGroupReadOnly()
+		{
+			return 0;
+		}
+#endif
+		virtual rage::Vec3V GetPosition()
+		{
+			return {0.f, 0.f, 0.f, 0.f};
+		}
+
+		virtual rage::audOrientation GetOrientation()
+		{
+			return { 0.f, 0.f };
+		}
+#if IS_RDR3
+		virtual void unk_0x98()
+		{
+
+		}
+#endif
+		virtual uint32_t InitializeEntityVariables()
+		{
+			m_0A = -1;
+			return -1;
+		}
+
+		virtual void* GetOwningEntity()
 		{
 			return nullptr;
 		}
 
-		return (audMixerSubmix*)m_submixes[idx];
-	}
+		void CreateSound_PersistentReference(const char* name, audSound** outSound, const audSoundInitParams& params);
 
-private:
-	virtual ~audMixerDevice() = 0;
+		void CreateSound_PersistentReference(uint32_t nameHash, audSound** outSound, const audSoundInitParams& params);
 
-	uint64_t m_8;
-#ifdef GTA_FIVE
-	uint8_t m_submixes[40][256];
-#elif IS_RDR3
-	uint8_t m_submixes[40][368];
-#endif
-	uint32_t m_numSubmixes;
-};
-
-static hook::thiscall_stub<audMixerSubmix*(audMixerDevice* self, const char* name, int numOutputChannels, bool a3)> _audMixerDevice_CreateSubmix([]
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("48 C1 E3 08 89 82 00 28 00", -0x17);
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? 48 63 8F ? ? ? ? 48 8B D0"));
-#endif
-});
-
-#ifdef GTA_FIVE
-static hook::thiscall_stub<uint8_t(audMixerDevice* self, audMixerSubmix* submix)> _audMixerDevice_GetSubmixIndex([]
-{
-	return hook::get_pattern("83 C8 FF C3 48 2B D1", -0x5);
-});
-
-static hook::thiscall_stub<void(audMixerDevice* self)> _audMixerDevice_ComputeProcessingGraph([]
-{
-	return hook::get_pattern("48 63 83 00 28 00 00 48 8B CB 41 BD", -0x28);
-});
-#endif
-
-static hook::thiscall_stub<void(audMixerDevice* self, uint32_t)> _audMixerDevice_FlagThreadCommandBufferReadyToProcess([]
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("48 8B 81 68 F2 00 00 4E 8B", -0x25);
-#elif IS_RDR3
-	return hook::get_pattern("41 8B 81 ? ? ? ? 48 8D 14 40 48 03 D2 45 89 54 D1 ? 41", -0x30);
-#endif
-});
-
-static hook::thiscall_stub<void(audMixerDevice* self, const char*, uint32_t)> _audMixerDevice_InitClientThread([]
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("B9 B0 00 00 00 45 8B F0 48 8B FA E8", -0x1C);
-#elif IS_RDR3
-	return hook::get_pattern("48 89 48 DC 89 48 E4", -0x45);
-#endif
-});
-
-audMixerSubmix* audMixerDevice::CreateSubmix(const char* name, int numOutputChannels, bool a3)
-{
-	return _audMixerDevice_CreateSubmix(this, name, numOutputChannels, a3);
-}
-
-uint8_t audMixerDevice::GetSubmixIndex(audMixerSubmix* submix)
-{
-#ifdef GTA_FIVE
-	return _audMixerDevice_GetSubmixIndex(this, submix);
-#elif IS_RDR3
-	if (!submix)
-	{
-		return -1;
-	}
-
-	return *reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(submix) + 0x150);
-#endif
-}
-
-#ifdef GTA_FIVE
-void audMixerDevice::ComputeProcessingGraph()
-{
-	return _audMixerDevice_ComputeProcessingGraph(this);
-}
-#endif
-
-void audMixerDevice::FlagThreadCommandBufferReadyToProcess(uint32_t a1 /* = 0 */)
-{
-	return _audMixerDevice_FlagThreadCommandBufferReadyToProcess(this, a1);
-}
-
-void audMixerDevice::InitClientThread(const char* name, uint32_t bufferSize)
-{
-	return _audMixerDevice_InitClientThread(this, name, bufferSize);
-}
-
-class audDriver
-{
-public:
-	inline static audMixerDevice* GetMixer()
-	{
-		return *sm_Mixer;
-	}
-
-public:
-	static audMixerDevice** sm_Mixer;
-};
-
-class audRequestedSettings;
-
-class audSound
-{
-public:
-#ifdef GTA_FIVE
-	virtual ~audSound() = 0;
-
-	virtual void m_8() = 0;
-
-	virtual void m_10() = 0;
-
-	virtual void m_18() = 0;
-
-	virtual void Init() = 0;
-
-	virtual void m_28() = 0;
-#elif IS_RDR3
-	virtual bool FindAndSetVariableValueWrapper(void) = 0;
-
-	virtual bool FindAndSetVariableValue(void) = 0;
-
-	virtual bool FindAndSetVariableHashValue(void) = 0;
-
-	virtual void throw__0x52D76AA0_01() = 0;
-
-	virtual uint64_t Pause(uint32_t unk) = 0;
-
-	virtual uint64_t FindVariableDownHierarchy(uint32_t, uint32_t) = 0;
-
-	virtual uint64_t FindVariableUpHierarchy(uint32_t, bool) = 0;
-
-	virtual ~audSound() = 0;
-
-	virtual uint64_t Init(const class audSoundInternalInitParams*, class audSoundScratchInitParams*, void*) = 0;
-
-	virtual void throw__0x52D76AA0_02() = 0;
-
-	virtual void throw__0x52D76AA0_03() = 0;
-
-	virtual void throw__0x52D76AA0_04() = 0;
-
-	virtual void throw__0x52D76AA0_05() = 0;
-
-	virtual uint64_t ActionReleaseRequest(uint32_t) = 0;
-#endif
-	void PrepareAndPlay(audWaveSlot* waveSlot, bool a2, int a3, bool a4);
-
-	void StopAndForget(bool a1);
-
-	audRequestedSettings* GetRequestedSettings();
-
-public:
-#ifdef GTA_FIVE
-	char pad[141 - 8];
-	uint8_t unkBitFlag : 3;
-#elif IS_RDR3
-	char pad_0008[152];
-	uint8_t bucketID;
-	char pad_00A1[53];
-	uint16_t settingsID;
-#endif
-};
-
-static hook::cdecl_stub<void(audSound*, void*, bool, int, bool)> _audSound_PrepareAndPlay([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("0F 85 ? 00 00 00 41 83 CB FF 45 33 C0", -0x35);
-#elif IS_RDR3
-	return hook::get_pattern("48 83 EC 20 33 DB 41 8B F9 45 8A F0", -0x15);
-#endif
-});
-
-static hook::cdecl_stub<void(audSound*, bool)> _audSound_StopAndForget([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("74 24 45 0F B6 41 62", -0x10);
-#elif IS_RDR3
-	return hook::get_pattern("88 91 ? ? ? ? 8A C2 4D 8B 41 58", -0x52);
-#endif
-});
-
-void audSound::PrepareAndPlay(audWaveSlot* a1, bool a2, int a3, bool a4)
-{
-	_audSound_PrepareAndPlay(this, a1, a2, a3, a4);
-}
-
-void audSound::StopAndForget(bool a1)
-{
-	_audSound_StopAndForget(this, a1);
-}
-
-class audReferencedRingBuffer : public sysUseAllocator
-{
-public:
-	audReferencedRingBuffer();
-
-private:
-	~audReferencedRingBuffer();
-
-public:
-	inline void SetBuffer(void* buffer, uint32_t size)
-	{
-		m_data = buffer;
-		m_size = size;
-		m_initialized = true;
-	}
-
-	uint32_t PushAudio(const void* data, uint32_t size);
-
-	inline void Release()
-	{
-		if (InterlockedDecrement(&m_usageCount) == 0)
-		{
-			delete this;
-		}
-	}
-
-	int GetCustomMode();
-	void SetCustomMode(int idx);
-
-private:
-	void* m_data; // +0
-	uint32_t m_size; // +8
-	uint32_t m_fC; // +12
-	uint32_t m_f10_0; // +16
-	uint32_t m_f14_0; // +20
-	uint32_t m_f18_0; // +24
-	uint32_t m_pad_f1C; // +28
-	CRITICAL_SECTION m_lock; // +32
-	bool m_f48_0; // +72
-	bool m_initialized; // +73
-	uint8_t m_pad_f4A[6]; // +74
-	uint32_t m_usageCount; // +80
-	uint32_t m_f54; // +84
-};
-
-audReferencedRingBuffer::audReferencedRingBuffer()
-{
-	m_data = nullptr;
-	m_size = 0;
-
-	m_f10_0 = 0;
-	m_f14_0 = 0;
-	m_f18_0 = 0;
-	m_f48_0 = false;
-	m_initialized = false;
-
-	m_usageCount = 1;
-
-	InitializeCriticalSectionAndSpinCount(&m_lock, 1000);
-}
-
-audReferencedRingBuffer::~audReferencedRingBuffer()
-{
-	if (m_data)
-	{
-		rage::GetAllocator()->Free(m_data);
-		m_data = nullptr;
-	}
-
-	DeleteCriticalSection(&m_lock);
-}
-
-int audReferencedRingBuffer::GetCustomMode()
-{
-	if (m_pad_f1C == 0xBEEFCA3E)
-	{
-		return *(int*)&m_pad_f4A[0];
-	}
-
-	return -1;
-}
-
-void audReferencedRingBuffer::SetCustomMode(int idx)
-{
-	m_pad_f1C = 0xBEEFCA3E;
-	*(int*)&m_pad_f4A[0] = idx;
-}
-
-static hook::cdecl_stub<uint32_t(audReferencedRingBuffer*, const void*, uint32_t)> _audReferencedRingBuffer_PushAudio([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("8B 71 08 48 8B 29 2B F0 48 8B D9 41 8B", -0x1B);
-#elif IS_RDR3
-	return hook::get_pattern("44 8B 49 14 41 8B F8 8B 41 08 41 8B C9", -0x28);
-#endif
-});
-
-uint32_t audReferencedRingBuffer::PushAudio(const void* data, uint32_t size)
-{
-	return _audReferencedRingBuffer_PushAudio(this, data, size);
-}
-
-class audExternalStreamSound : public rage::audSound
-{
-public:
-	bool InitStreamPlayer(rage::audReferencedRingBuffer* buffer, int channels, int frequency);
-};
-
-static hook::cdecl_stub<bool(rage::audExternalStreamSound*, rage::audReferencedRingBuffer*, int, int)> _audExternalStreamSound_InitStreamPlayer([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("F0 FF 42 50 48 89 11 44 89 41", -0x2A);
-#elif IS_RDR3
-	return hook::get_pattern("49 03 8C 02 ? ? ? ? 74 12", -0x23);
-#endif
-});
-
-bool audExternalStreamSound::InitStreamPlayer(rage::audReferencedRingBuffer* buffer, int channels, int frequency)
-{
-	return _audExternalStreamSound_InitStreamPlayer(this, buffer, channels, frequency);
-}
-
-class audCategory
-{
-};
-
-class audCategoryManager
-{
-public:
-	rage::audCategory* GetCategoryPtr(uint32_t category);
-};
-
-static hook::cdecl_stub<rage::audCategory*(rage::audCategoryManager*, uint32_t)> _audCategoryManager_GetCategoryPtr([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_call(hook::get_pattern("48 8B CB BA EA 75 96 D5 E8", 8));
-#elif IS_RDR3
-	return hook::get_pattern("43 8D 04 08 99 2B C2 D1 F8 8B D0 8B C8 48 03 C0", -0x2C);
-#endif
-});
-
-rage::audCategory* audCategoryManager::GetCategoryPtr(uint32_t category)
-{
-	return _audCategoryManager_GetCategoryPtr(this, category);
-}
-
-struct Vec3V
-{
-	float x;
-	float y;
-	float z;
-	float pad;
-};
-
-struct audOrientation
-{
-	float x;
-	float y;
-};
-
-class audTracker
-{
-public:
-	virtual ~audTracker() = default;
-
-	virtual rage::Vec3V GetPosition()
-	{
-		return { 0.f, 0.f, 0.f, 0.f };
-	}
-
-	virtual rage::audOrientation GetOrientation()
-	{
-		return { 0.f, 0.f };
-	}
-};
-
-class audEnvironmentGroupInterface
-{
-public:
-	virtual ~audEnvironmentGroupInterface() = 0;
-};
-
-class audSoundInitParams
-{
-public:
-	audSoundInitParams();
-
-	void SetCategory(rage::audCategory* category);
-
-	void SetEnvironmentGroup(rage::audEnvironmentGroupInterface* environmentGroup);
-
-	void SetVolume(float volume);
-
-	void SetPositional(bool positional);
-
-	void SetTracker(audTracker* parent);
-
-	void SetPosition(float x, float y, float z);
-
-	void SetSubmixIndex(uint8_t index);
-
-	void SetUnk();
-
-	void SetAllocationBucket(uint8_t bucket);
-
-private:
-#ifdef GTA_FIVE
-	uint8_t m_pad[0xB0];
-#elif IS_RDR3
-	uint8_t m_pad[0x150];
-#endif
-};
-
-void audSoundInitParams::SetCategory(rage::audCategory* category)
-{
-#ifdef GTA_FIVE
-	*(audCategory**)(&m_pad[88]) = category;
-#elif IS_RDR3
-	*(audCategory**)(&m_pad[216]) = category;
-#endif
-}
-
-void audSoundInitParams::SetEnvironmentGroup(rage::audEnvironmentGroupInterface* environmentGroup)
-{
-#ifdef GTA_FIVE
-	*(audEnvironmentGroupInterface**)(&m_pad[96]) = environmentGroup;
-#elif IS_RDR3
-	*(audEnvironmentGroupInterface**)(&m_pad[224]) = environmentGroup;
-#endif
-}
-
-void audSoundInitParams::SetPosition(float x, float y, float z)
-{
-	auto f = (float*)m_pad;
-
-	f[0] = x;
-	f[1] = y;
-	f[2] = z;
-	f[3] = 0.f;
-}
-
-void audSoundInitParams::SetVolume(float volume)
-{
-#ifdef GTA_FIVE
-	*(float*)(&m_pad[48]) = volume;
-#elif IS_RDR3
-	*(float*)(&m_pad[164]) = volume;
-#endif
-}
-
-void audSoundInitParams::SetTracker(audTracker* parent)
-{
-#ifdef GTA_FIVE
-	*(audTracker**)(&m_pad[72]) = parent;
-#elif IS_RDR3
-	*(audTracker**)(&m_pad[200]) = parent;
-#endif
-}
-
-void audSoundInitParams::SetPositional(bool positional)
-{
-#ifdef GTA_FIVE
-	if (positional)
-	{
-		m_pad[158] |= 1;
-	}
-	else
-	{
-		m_pad[158] &= ~1;
-	}
-#elif IS_RDR3
-	if (positional)
-	{
-		m_pad[315] |= 1;
-	}
-	else
-	{
-		m_pad[315] &= ~1;
-	}
-#endif
-}
-
-void audSoundInitParams::SetSubmixIndex(uint8_t submix)
-{
-#ifdef GTA_FIVE
-	m_pad[155] = (submix - 0x1C) | 0x20;
-	// this field does really weird stuff in game
-	//*(uint8_t*)(&m_pad[0x98]) = submix;
-	//*(uint16_t*)(&m_pad[0x9B]) = 3;
-#elif IS_RDR3
-	*(uint16_t*)(&m_pad[0x134]) = (uint16_t)(submix);
-#endif
-}
-
-#ifdef GTA_FIVE
-void audSoundInitParams::SetUnk()
-{
-	m_pad[155] = 27;
-}
-#endif
-
-void audSoundInitParams::SetAllocationBucket(uint8_t bucket)
-{
-#ifdef GTA_FIVE
-	m_pad[154] = bucket;
-#elif IS_RDR3
-	m_pad[310] = bucket;
-#endif
-}
-
-static hook::cdecl_stub<void(rage::audSoundInitParams*)> _audSoundInitParams_ctor([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("0F 57 C0 48 8D 41 10 BA 03 00 00 00");
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? 8A 45 7A"));
-#endif
-});
-
-static uint8_t* initParamVal;
-
-audSoundInitParams::audSoundInitParams()
-{
-	_audSoundInitParams_ctor(this);
-
-	SetAllocationBucket(*initParamVal);
-}
-
-class audRequestedSettings
-{
-public:
-	void SetQuadSpeakerLevels(float levels[4]);
-
-	void SetVolume(float vol);
-
-	void SetVolumeCurveScale(float sca);
-
-	void SetEnvironmentalLoudness(uint8_t val);
-
-	void SetSourceEffectMix(float wet, float dry);
-};
-
-static hook::thiscall_stub<void(audRequestedSettings*, float)> _audRequestedSettings_SetVolume([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("F3 0F 11 8C D1 90 00 00 00", -0x11);
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? F3 44 0F 58 4E"));
-#endif
-});
-
-static hook::thiscall_stub<void(audRequestedSettings*, float)> _audRequestedSettings_SetVolumeCurveScale([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("F3 0F 11 8C D1 A8 00 00 00", -0x11);
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? 38 5E 6C"));
-#endif
-});
-
-static hook::thiscall_stub<void(audRequestedSettings*, uint8_t)> _audRequestedSettings_SetEnvironmentalLoudness([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("42 88 94 C1 B1 00 00 00", -0x11);
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? C7 87 ? ? ? ? ? ? ? ? 48 8B 83 ? ? ? ? 48 85 C0 74 52"));
-#endif
-});
-
-static hook::thiscall_stub<void(audRequestedSettings*, uint8_t)> _audRequestedSettings_SetSpeakerMask([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("42 88 94 C1 B0 00 00 00", -0x11);
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? 44 8A 86 ? ? ? ? 48 8B CF"));
-#endif
-});
-
-static hook::thiscall_stub<void(audRequestedSettings*, float, float)> _audRequestedSettings_SetSourceEffectMix([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("F3 0F 11 8C D1 98 00 00 00", -0x11);
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? F3 0F 10 0D ? ? ? ? 49 8B CF F3 0F 58 4E"));
-#endif
-});
-
-static hook::thiscall_stub<void(audRequestedSettings*, float[4])> _audRequestedSettings_SetQuadSpeakerLevels([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("B8 00 80 00 00 66 09 84", -0x61);
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? 40 8A B5 ? ? ? ? 40 80 FE 01"));
-#endif
-});
-
-void audRequestedSettings::SetVolume(float vol)
-{
-	_audRequestedSettings_SetVolume(this, vol);
-}
-
-void audRequestedSettings::SetQuadSpeakerLevels(float levels[4])
-{
-	_audRequestedSettings_SetQuadSpeakerLevels(this, levels);
-}
-
-void audRequestedSettings::SetVolumeCurveScale(float vol)
-{
-	_audRequestedSettings_SetVolumeCurveScale(this, vol);
-}
-
-void audRequestedSettings::SetEnvironmentalLoudness(uint8_t vol)
-{
-	_audRequestedSettings_SetEnvironmentalLoudness(this, vol);
-}
-
-void audRequestedSettings::SetSourceEffectMix(float wet, float dry)
-{
-	_audRequestedSettings_SetSourceEffectMix(this, wet, dry);
-}
-
-class audEntity
-{
-public:
-	audEntity();
-
-	virtual ~audEntity();
-
+	private:
 #if IS_RDR3
-	virtual void unk_0x8()
-	{
-	}
+		char m_pad[8] = {};
 #endif
+		uint16_t m_entityId{
+			0xffff
+		};
 
-	virtual void Init();
-
-	virtual void Shutdown();
-
-	virtual void StopAllSounds(bool);
-
-	virtual void PreUpdateService(uint32_t)
-	{
-	}
-
+		uint16_t m_0A{
+			0xffff
+		};
 #if IS_RDR3
-	virtual void PreUpdateServiceInternal(uint32_t a1)
+		uint32_t state{
+			1
+		};
+#endif
+	};
+
+	audEntity::audEntity()
 	{
+
+	}
+
+	audEntity::~audEntity()
+	{
+		Shutdown();
+	}
+#ifdef GTA_FIVE
+	static hook::cdecl_stub<void(audEntity*, const char*, audSound**, const audSoundInitParams&)> _audEntity_CreateSound_PersistentReference_char([]()
+	{
+		return hook::get_call(hook::get_pattern("4C 8D 4C 24 50 4C 8D 43 08 48 8D 0D", 0x14));
+	});
+#endif
+	static hook::cdecl_stub<void(audEntity*, uint32_t, audSound**, const audSoundInitParams&)> _audEntity_CreateSound_PersistentReference_uint([]()
+	{
+#ifdef GTA_FIVE
+		return (void*)hook::get_call(hook::get_call(hook::get_pattern<char>("4C 8D 4C 24 50 4C 8D 43 08 48 8D 0D", 0x14)) + 0x3F);
+#elif IS_RDR3
+		return hook::get_pattern("48 89 78 20 41 56 48 81 EC ? ? ? ? 83 79 14 00 49 8B", -0x18);
+#endif
+	});
+#ifdef GTA_FIVE
+	void audEntity::CreateSound_PersistentReference(const char* name, audSound** outSound, const audSoundInitParams& params)
+	{
+		return _audEntity_CreateSound_PersistentReference_char(this, name, outSound, params);
 	}
 #endif
-
-	virtual void PostUpdate()
+	void audEntity::CreateSound_PersistentReference(uint32_t nameHash, audSound** outSound, const audSoundInitParams& params)
 	{
+		return _audEntity_CreateSound_PersistentReference_uint(this, nameHash, outSound, params);
 	}
 
-	virtual void UpdateSound(rage::audSound*, rage::audRequestedSettings*, uint32_t)
+	static hook::thiscall_stub<void(audEntity*)> rage__audEntity__Init([]()
 	{
+#ifdef GTA_FIVE
+		return hook::get_call(hook::get_pattern("48 81 EC C0 00 00 00 48 8B D9 E8 ? ? ? ? 45 33 ED", 10));
+#elif IS_RDR3
+		return hook::get_pattern("48 83 EC 28 80 3D ? ? ? ? ? 74 16 83 79 14 01");
+#endif
+	});
+
+	static hook::thiscall_stub<void(audEntity*)> rage__audEntity__Shutdown([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_call(hook::get_pattern("48 83 EC 20 48 8B F9 E8 ? ? ? ? 33 ED", 7));
+#elif IS_RDR3
+		return hook::get_pattern("40 53 48 83 EC 20 48 8B D9 E8 ? ? ? ? 66 83 7B ? ? 7C 10");
+#endif
+	});
+
+	static hook::thiscall_stub<void(audEntity*, bool)> rage__audEntity__StopAllSounds([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_call(hook::get_pattern("0F 82 67 FF FF FF E8 ? ? ? ? 84 C0", 24));
+#elif IS_RDR3
+		return hook::get_pattern("48 83 EC 28 B8 ? ? ? ? 66 39 41 10 74 12");
+#endif
+	});
+
+	void audEntity::Init()
+	{
+		rage__audEntity__Init(this);
 	}
 
-#if IS_RDR3
-	virtual bool HasPendingAnimEvents()
+	void audEntity::Shutdown()
 	{
-		return false;
+		rage__audEntity__Shutdown(this);
 	}
 
-	virtual bool HasPendingDeferredSounds()
+	void audEntity::StopAllSounds(bool a)
 	{
-		return false;
+		rage__audEntity__StopAllSounds(this, a);
 	}
 
-	virtual void unk_0x58()
+	audEntity* g_frontendAudioEntity;
+
+	audCategoryManager* g_categoryMgr;
+
+	class audCategoryControllerManager
 	{
+	public:
+		char* CreateController(uint32_t hash);
+
+		static audCategoryControllerManager* GetInstance();
+	};
+
+	audCategoryControllerManager* audCategoryControllerManager::GetInstance()
+	{
+#ifdef GTA_FIVE
+		static auto patternRef = hook::get_address<audCategoryControllerManager**>(hook::get_pattern("45 33 C0 BA 90 1C E2 44 E8", -4));
+#elif IS_RDR3
+		static auto patternRef = hook::get_address<audCategoryControllerManager**>(hook::get_pattern("48 8B 0D ? ? ? ? E8 ? ? ? ? 8B 15 ? ? ? ? 48 8D 0D ? ? ? ? E8", 3));
+#endif
+		return *patternRef;
+	}
+
+	static hook::thiscall_stub<char*(audCategoryControllerManager*, uint32_t)> _audCategoryControllerManager_CreateController([]()
+	{
+#ifdef GTA_FIVE
+		return hook::get_call(hook::get_pattern("45 33 C0 BA 90 1C E2 44 E8", 8));
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? 48 89 45 D0 48 8B C8"));
+#endif
+	});
+
+	char* audCategoryControllerManager::CreateController(uint32_t hash)
+	{
+		return _audCategoryControllerManager_CreateController(this, hash);
+	}
+
+	static HookFunction hookFunction([]()
+	{
+#ifdef GTA_FIVE
+		g_frontendAudioEntity = hook::get_address<audEntity*>(hook::get_pattern("4C 8D 4C 24 50 4C 8D 43 08 48 8D 0D", 0xC));
+
+		g_categoryMgr = hook::get_address<audCategoryManager*>(hook::get_pattern("48 8B CB BA EA 75 96 D5 E8", -4));
+
+		initParamVal = hook::get_address<uint8_t*>(hook::get_pattern("BA 11 CC 23 C3 E8 ? ? ? ? 48 8D", 0x16));
+
+		audDriver::sm_Mixer = hook::get_address<audMixerDevice**>(hook::get_pattern("75 64 44 0F B7 45 06 48 8B 0D", 10));
+#elif IS_RDR3
+		g_frontendAudioEntity = hook::get_address<audEntity*>(hook::get_pattern("48 8D 0D ? ? ? ? E8 ? ? ? ? 45 84 E4 74 ? 39 1D"), 3, 7);
+
+		g_categoryMgr = hook::get_address<audCategoryManager*>(hook::get_pattern("48 8D 0D ? ? ? ? E8 ? ? ? ? BE ? ? ? ? 48 8D 0D ? ? ? ? 8B D6"), 3, 7);
+
+		initParamVal = hook::get_address<uint8_t*>(hook::get_pattern("8A 05 ? ? ? ? 48 8B CF F3 0F 11 45 ? 88 45 66"), 2, 6);
+
+		audDriver::sm_Mixer = hook::get_address<audMixerDevice**>(hook::get_pattern("48 8B 05 ? ? ? ? 44 38 8C 01 ? ? ? ? 0F"), 3, 7);
+#endif
+	});
+#ifdef GTA_FIVE
+	static hook::cdecl_stub<audWaveSlot*(uint32_t)> _findWaveSlot([]()
+	{
+		return hook::get_call(hook::get_pattern("0F 85 ? ? ? ? B9 A1 C7 05 92 E8", 11));
+	});
+
+	audWaveSlot* audWaveSlot::FindWaveSlot(uint32_t hash)
+	{
+		return _findWaveSlot(hash);
 	}
 #endif
-
-	virtual bool IsUnpausable()
+	static hook::cdecl_stub<float(float)> _linearToDb([]()
 	{
-		return false;
-	}
-
-	virtual uint32_t QuerySoundNameFromObjectAndField(const uint32_t*, uint32_t, const rage::audSound*)
-	{
-		return 0;
-	}
-
-	virtual void QuerySpeechVoiceAndContextFromField(uint32_t, uint32_t&, uint32_t&)
-	{
-	}
-
-#if IS_RDR3
-	virtual uint64_t GetEnvironmentGroup(bool a1)
-	{
-		return 0;
-	}
-
-	virtual uint64_t GetEnvironmentGroupReadOnly()
-	{
-		return 0;
-	}
+#ifdef GTA_FIVE
+		return hook::get_pattern("8B 4C 24 08 8B C1 81 E1 FF FF 7F 00", -0x14);
+#elif IS_RDR3
+		return hook::get_call(hook::get_pattern("E8 ? ? ? ? 44 8B 73 18"));
 #endif
+	});
 
-
-	virtual rage::Vec3V GetPosition()
+	float GetDbForLinear(float x)
 	{
-		return { 0.f, 0.f, 0.f, 0.f };
+		return _linearToDb(x);
 	}
 
-	virtual rage::audOrientation GetOrientation()
-	{
-		return { 0.f, 0.f };
-	}
-#if IS_RDR3
-	virtual void unk_0x98()
-	{
-	}
-#endif
+	static uint64_t* _settingsBase;
+	static uint32_t* _settingsIdx;
 
-	virtual uint32_t InitializeEntityVariables()
+	audRequestedSettings* audSound::GetRequestedSettings()
 	{
-		m_0A = -1;
-		return -1;
-	}
+#ifdef GTA_FIVE
+		char* v4 = (char*)this;
 
-	virtual void* GetOwningEntity()
-	{
+		audRequestedSettings* v5 = nullptr;
+		uint8_t v7 = *(unsigned __int8*)(v4 + 128);
+		if (v7 != 255)
+			v5 = (audRequestedSettings*)(*(uint64_t*)(13520i64 * *(unsigned __int8*)(v4 + 98) + *_settingsBase + 13504)
+				 + (unsigned int)(size_t(v7) * *_settingsIdx));
+
+		return v5;
+#elif IS_RDR3
+		int16_t v7 = *reinterpret_cast<int16_t*>(reinterpret_cast<char*>(this) + 0xD6);
+		int16_t v8 = *reinterpret_cast<uint8_t*>(reinterpret_cast<char*>(this) + 0xA0);
+		if (v7 != 255)
+			return reinterpret_cast<audRequestedSettings*>(*reinterpret_cast<uint64_t*>(0x2A860 * v8 + *_settingsBase + 0x2A850) + static_cast<uint32_t>(v7 * *_settingsIdx));
+
 		return nullptr;
+#endif
 	}
 
-	void CreateSound_PersistentReference(const char* name, audSound** outSound, const audSoundInitParams& params);
-
-	void CreateSound_PersistentReference(uint32_t nameHash, audSound** outSound, const audSoundInitParams& params);
-
-private:
-#if IS_RDR3
-	char m_pad[8] = {};
+	static HookFunction hfRs([]()
+	{
+#ifdef GTA_FIVE
+		auto location = hook::get_pattern<char>("74 23 0F B6 48 62 0F AF 15");
+		_settingsIdx = hook::get_address<uint32_t*>(location + 9);
+		_settingsBase = hook::get_address<uint64_t*>(location + 16);
+#elif IS_RDR3
+		auto location = hook::get_pattern<char>("48 8B 43 EE 66 0F 7F 74 24 ? 0F B7");
+		_settingsIdx = hook::get_address<uint32_t*>(location + 0x23);
+		_settingsBase = hook::get_address<uint64_t*>(location + 0x31);
 #endif
-	uint16_t m_entityId{
-		0xffff
+	});
+
+	struct audStreamPlayer
+	{
+		void* vtbl;
+		uint8_t pad[48 - 8];
+		audReferencedRingBuffer* ringBuffer; // +48
+		void* pad2; // +56
+		uint32_t pad3; // +64
+		uint32_t size; // +68
+		uint8_t pad4[11]; // +72
+		uint8_t frameOffset;
 	};
-
-	uint16_t m_0A{
-		0xffff
-	};
-
-#if IS_RDR3
-	uint32_t state{
-		1
-	};
-#endif
-};
-
-audEntity::audEntity()
-{
-}
-
-audEntity::~audEntity()
-{
-	Shutdown();
-}
-
-#ifdef GTA_FIVE
-static hook::cdecl_stub<void(audEntity*, const char*, audSound**, const audSoundInitParams&)> _audEntity_CreateSound_PersistentReference_char([]()
-{
-	return hook::get_call(hook::get_pattern("4C 8D 4C 24 50 4C 8D 43 08 48 8D 0D", 0x14));
-});
-#endif
-
-static hook::cdecl_stub<void(audEntity*, uint32_t, audSound**, const audSoundInitParams&)> _audEntity_CreateSound_PersistentReference_uint([]()
-{
-#ifdef GTA_FIVE
-	return (void*)hook::get_call(hook::get_call(hook::get_pattern<char>("4C 8D 4C 24 50 4C 8D 43 08 48 8D 0D", 0x14)) + 0x3F);
-#elif IS_RDR3
-	return hook::get_pattern("48 89 78 20 41 56 48 81 EC ? ? ? ? 83 79 14 00 49 8B", -0x18);
-#endif
-});
-
-#ifdef GTA_FIVE
-void audEntity::CreateSound_PersistentReference(const char* name, audSound** outSound, const audSoundInitParams& params)
-{
-	return _audEntity_CreateSound_PersistentReference_char(this, name, outSound, params);
-}
-#endif
-
-void audEntity::CreateSound_PersistentReference(uint32_t nameHash, audSound** outSound, const audSoundInitParams& params)
-{
-	return _audEntity_CreateSound_PersistentReference_uint(this, nameHash, outSound, params);
-}
-
-static hook::thiscall_stub<void(audEntity*)> rage__audEntity__Init([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_call(hook::get_pattern("48 81 EC C0 00 00 00 48 8B D9 E8 ? ? ? ? 45 33 ED", 10));
-#elif IS_RDR3
-	return hook::get_pattern("48 83 EC 28 80 3D ? ? ? ? ? 74 16 83 79 14 01");
-#endif
-});
-
-static hook::thiscall_stub<void(audEntity*)> rage__audEntity__Shutdown([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_call(hook::get_pattern("48 83 EC 20 48 8B F9 E8 ? ? ? ? 33 ED", 7));
-#elif IS_RDR3
-	return hook::get_pattern("40 53 48 83 EC 20 48 8B D9 E8 ? ? ? ? 66 83 7B ? ? 7C 10");
-#endif
-});
-
-static hook::thiscall_stub<void(audEntity*, bool)> rage__audEntity__StopAllSounds([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_call(hook::get_pattern("0F 82 67 FF FF FF E8 ? ? ? ? 84 C0", 24));
-#elif IS_RDR3
-	return hook::get_pattern("48 83 EC 28 B8 ? ? ? ? 66 39 41 10 74 12");
-#endif
-});
-
-void audEntity::Init()
-{
-	rage__audEntity__Init(this);
-}
-
-void audEntity::Shutdown()
-{
-	rage__audEntity__Shutdown(this);
-}
-
-void audEntity::StopAllSounds(bool a)
-{
-	rage__audEntity__StopAllSounds(this, a);
-}
-
-audEntity* g_frontendAudioEntity;
-
-audCategoryManager* g_categoryMgr;
-
-class audCategoryControllerManager
-{
-public:
-	char* CreateController(uint32_t hash);
-
-	static audCategoryControllerManager* GetInstance();
-};
-
-audCategoryControllerManager* audCategoryControllerManager::GetInstance()
-{
-#ifdef GTA_FIVE
-	static auto patternRef = hook::get_address<audCategoryControllerManager**>(hook::get_pattern("45 33 C0 BA 90 1C E2 44 E8", -4));
-#elif IS_RDR3
-	static auto patternRef = hook::get_address<audCategoryControllerManager**>(hook::get_pattern("48 8B 0D ? ? ? ? E8 ? ? ? ? 8B 15 ? ? ? ? 48 8D 0D ? ? ? ? E8", 3));
-#endif
-
-	return *patternRef;
-}
-
-static hook::thiscall_stub<char*(audCategoryControllerManager*, uint32_t)> _audCategoryControllerManager_CreateController([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_call(hook::get_pattern("45 33 C0 BA 90 1C E2 44 E8", 8));
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? 48 89 45 D0 48 8B C8"));
-#endif
-});
-
-char* audCategoryControllerManager::CreateController(uint32_t hash)
-{
-	return _audCategoryControllerManager_CreateController(this, hash);
-}
-
-static HookFunction hookFunction([]()
-{
-#ifdef GTA_FIVE
-	g_frontendAudioEntity = hook::get_address<audEntity*>(hook::get_pattern("4C 8D 4C 24 50 4C 8D 43 08 48 8D 0D", 0xC));
-
-	g_categoryMgr = hook::get_address<audCategoryManager*>(hook::get_pattern("48 8B CB BA EA 75 96 D5 E8", -4));
-
-	initParamVal = hook::get_address<uint8_t*>(hook::get_pattern("BA 11 CC 23 C3 E8 ? ? ? ? 48 8D", 0x16));
-
-	audDriver::sm_Mixer = hook::get_address<audMixerDevice**>(hook::get_pattern("75 64 44 0F B7 45 06 48 8B 0D", 10));
-#elif IS_RDR3
-	g_frontendAudioEntity = hook::get_address<audEntity*>(hook::get_pattern("48 8D 0D ? ? ? ? E8 ? ? ? ? 45 84 E4 74 ? 39 1D"), 3, 7);
-
-	g_categoryMgr = hook::get_address<audCategoryManager*>(hook::get_pattern("48 8D 0D ? ? ? ? E8 ? ? ? ? BE ? ? ? ? 48 8D 0D ? ? ? ? 8B D6"), 3, 7);
-
-	initParamVal = hook::get_address<uint8_t*>(hook::get_pattern("8A 05 ? ? ? ? 48 8B CF F3 0F 11 45 ? 88 45 66"), 2, 6);
-
-	audDriver::sm_Mixer = hook::get_address<audMixerDevice**>(hook::get_pattern("48 8B 05 ? ? ? ? 44 38 8C 01 ? ? ? ? 0F"), 3, 7);
-#endif
-});
-
-#ifdef GTA_FIVE
-static hook::cdecl_stub<audWaveSlot*(uint32_t)> _findWaveSlot([]()
-{
-	return hook::get_call(hook::get_pattern("0F 85 ? ? ? ? B9 A1 C7 05 92 E8", 11));
-});
-
-audWaveSlot* audWaveSlot::FindWaveSlot(uint32_t hash)
-{
-	return _findWaveSlot(hash);
-}
-#endif
-
-static hook::cdecl_stub<float(float)> _linearToDb([]()
-{
-#ifdef GTA_FIVE
-	return hook::get_pattern("8B 4C 24 08 8B C1 81 E1 FF FF 7F 00", -0x14);
-#elif IS_RDR3
-	return hook::get_call(hook::get_pattern("E8 ? ? ? ? 44 8B 73 18"));
-#endif
-});
-
-float GetDbForLinear(float x)
-{
-	return _linearToDb(x);
-}
-
-static uint64_t* _settingsBase;
-static uint32_t* _settingsIdx;
-
-audRequestedSettings* audSound::GetRequestedSettings()
-{
-#ifdef GTA_FIVE
-	char* v4 = (char*)this;
-
-	audRequestedSettings* v5 = nullptr;
-	uint8_t v7 = *(unsigned __int8*)(v4 + 128);
-	if (v7 != 255)
-		v5 = (audRequestedSettings*)(*(uint64_t*)(13520i64 * *(unsigned __int8*)(v4 + 98) + *_settingsBase + 13504)
-									 + (unsigned int)(size_t(v7) * *_settingsIdx));
-
-	return v5;
-#elif IS_RDR3
-	int16_t v7 = *reinterpret_cast<int16_t*>(reinterpret_cast<char*>(this) + 0xD6);
-	int16_t v8 = *reinterpret_cast<uint8_t*>(reinterpret_cast<char*>(this) + 0xA0);
-	if (v7 != 255)
-		return reinterpret_cast<audRequestedSettings*>(*reinterpret_cast<uint64_t*>(0x2A860 * v8 + *_settingsBase + 0x2A850) + static_cast<uint32_t>(v7 * *_settingsIdx));
-
-	return nullptr;
-#endif
-}
-
-static HookFunction hfRs([]()
-{
-#ifdef GTA_FIVE
-	auto location = hook::get_pattern<char>("74 23 0F B6 48 62 0F AF 15");
-	_settingsIdx = hook::get_address<uint32_t*>(location + 9);
-	_settingsBase = hook::get_address<uint64_t*>(location + 16);
-#elif IS_RDR3
-	auto location = hook::get_pattern<char>("48 8B 43 EE 66 0F 7F 74 24 ? 0F B7");
-	_settingsIdx = hook::get_address<uint32_t*>(location + 0x23);
-	_settingsBase = hook::get_address<uint64_t*>(location + 0x31);
-#endif
-});
-
-struct audStreamPlayer
-{
-	void* vtbl;
-	uint8_t pad[48 - 8];
-	audReferencedRingBuffer* ringBuffer; // +48
-	void* pad2; // +56
-	uint32_t pad3; // +64
-	uint32_t size; // +68
-	uint8_t pad4[11]; // +72
-	uint8_t frameOffset;
-};
 }
 
 class naEnvironmentGroup : public rage::audEnvironmentGroupInterface
@@ -1232,8 +1219,8 @@ static hook::thiscall_stub<void(rage::audEntity*, bool a2, bool a3)> StartMenuMu
 });
 #endif
 
-
-extern "C" {
+extern "C"
+{
 #include <libswresample/swresample.h>
 };
 
@@ -1257,7 +1244,7 @@ public:
 	virtual void Shutdown() override;
 
 	void MInit(float overrideVolume);
-
+	
 	void MShutdown();
 
 	virtual rage::Vec3V GetPosition() override
@@ -1348,6 +1335,7 @@ private:
 
 	std::function<void(int)> m_poller;
 };
+
 
 static void (*g_origGenerateFrame)(rage::audStreamPlayer* self);
 static std::shared_mutex g_customEntriesLock;
@@ -1489,7 +1477,7 @@ void MumbleAudioEntity::MInit(float overrideVolume)
 	CreateSound_PersistentReference(0x0F4A60A9, (rage::audSound**)&m_sound, initValues);
 #endif
 
-	// trace("created sound (%s): %016llx\n", ToNarrow(m_name), (uintptr_t)m_sound);
+	//trace("created sound (%s): %016llx\n", ToNarrow(m_name), (uintptr_t)m_sound);
 
 	if (m_sound)
 	{
@@ -1526,7 +1514,7 @@ void MumbleAudioEntity::MShutdown()
 
 	if (sound)
 	{
-		// trace("deleting sound (%s): %016llx\n", ToNarrow(m_name), (uintptr_t)sound);
+		//trace("deleting sound (%s): %016llx\n", ToNarrow(m_name), (uintptr_t)sound);
 
 		sound->StopAndForget(false);
 		m_sound = nullptr;
@@ -1539,7 +1527,7 @@ void MumbleAudioEntity::MShutdown()
 	}
 
 	// needs to be delayed to when the sound is removed
-	// delete m_environmentGroup;
+	//delete m_environmentGroup;
 	m_environmentGroup = nullptr;
 
 	auto buffer = m_buffer;
@@ -1586,8 +1574,7 @@ void MumbleAudioEntity::PreUpdateService(uint32_t)
 		{
 			settings->SetVolumeCurveScale(1.0f);
 		}
-
-#ifdef GTA_FIVE
+#ifdef GTA_FIVE		
 		if (m_overrideVolume >= 0.0f)
 		{
 			settings->SetVolume(rage::GetDbForLinear(m_overrideVolume));
@@ -1619,7 +1606,6 @@ void MumbleAudioEntity::PreUpdateService(uint32_t)
 		settings->SetVolume(rage::GetDbForLinear(1.0f));
 		*((char*)settings + 0x25F) |= 8;
 #endif
-
 		if (m_overrideVolume >= 0.0f)
 		{
 			float levels[4] = { 1.0f,
@@ -1662,7 +1648,6 @@ void MumbleAudioEntity::PreUpdateService(uint32_t)
 
 	return;
 #endif
-
 #ifdef GTA_FIVE
 	if (m_environmentGroup)
 	{
@@ -1713,10 +1698,9 @@ void MumbleAudioEntity::PreUpdateService(uint32_t)
 		}
 	}
 #endif
-
 	if (m_poller)
 	{
-		// m_poller();
+		//m_poller();
 	}
 }
 
@@ -1914,7 +1898,9 @@ void MumbleAudioSink::Process()
 			m_lastSubmixId = submixId;
 		}
 
-		if (m_overrideVolume != m_lastOverrideVolume || submixId != m_lastSubmixId || ped != m_lastPed)
+		if (m_overrideVolume != m_lastOverrideVolume ||
+			submixId != m_lastSubmixId ||
+			ped != m_lastPed)
 		{
 			Reset();
 
@@ -1928,7 +1914,7 @@ void MumbleAudioSink::Process()
 		}
 
 		m_entity->SetPosition((float*)&m_position, m_distance, m_overrideVolume);
-
+		
 		if (ped > 0)
 		{
 			auto address = FxNativeInvoke::Invoke<CPed*>(getEntityAddress, ped);
@@ -1950,7 +1936,6 @@ void ProcessAudioSinks()
 		sink->Process();
 	}
 }
-
 #ifdef GTA_FIVE
 class RageAudioStream : public nui::IAudioStream
 {
@@ -2049,9 +2034,7 @@ void RageAudioStream::ProcessPacket(const float** data, int frames, int64_t pts)
 	}
 }
 #endif
-
 static bool audioRunning;
-
 #ifdef GTA_FIVE
 bool RageAudioStream::TryEnsureInitialized()
 {
@@ -2063,7 +2046,7 @@ bool RageAudioStream::TryEnsureInitialized()
 	if (audioRunning)
 	{
 		rage::audSoundInitParams initValues;
-
+		
 		// set the audio category
 		if (!m_initParams.categoryName.empty())
 		{
@@ -2125,22 +2108,21 @@ enum AudioPrefs
 	PREF_MUSIC_VOLUME_IN_MP = 0x25,
 };
 #endif
-
 #ifdef GTA_FIVE
 static bool (*g_origLoadCategories)(void* a1, const char* why, const char* filename, int a4, int version, bool, void*);
+
 bool LoadCategories(void* a1, const char* why, const char* filename, int a4, int version, bool a6, void* a7)
 {
 	return g_origLoadCategories(a1, why, "citizen:/platform/audio/config/categories.dat", a4, version, a6, a7);
 }
 #elif IS_RDR3
 static bool (*g_origLoadCategories)(void* a1, int a2, int a3, const char* filename, int version, int a6, int a7, char a8, const char* a9, uint64_t a10, int a11, uint64_t a12, int a13);
+
 bool LoadCategories(void* a1, int a2, int a3, const char* filename, int version, int a6, int a7, char a8, const char* a9, uint64_t a10, int a11, uint64_t a12, int a13)
 {
 	return g_origLoadCategories(a1, a2, a3, "citizen:/platform/audio/config/categories.dat", version, a6, a7, a8, a9, a10, a11, a12, a13);
 }
 #endif
-
-
 
 static void (*g_origOddFunc)(void*, uint16_t, float, int, int, int, int);
 static bool (*g_origaudEnvironmentSound_Init)(void* sound, void* a, void* b, void* params);
@@ -2178,7 +2160,6 @@ static bool (*g_orig_audConfig_GetData_uint)(const char*, uint32_t&);
 
 static bool audConfig_GetData_uint(const char* param, uint32_t& out)
 {
-
 	if (strcmp(param, "engineSettings_NumBuckets") == 0)
 	{
 #ifdef GTA_FIVE
@@ -2197,7 +2178,6 @@ static HookFunction hookFunction([]()
 #ifdef GTA_FIVE
 	g_preferenceArray = hook::get_address<uint32_t*>(hook::get_pattern("48 8D 15 ? ? ? ? 8D 43 01 83 F8 02 77 2D", 3));
 #endif
-
 	{
 #ifdef GTA_FIVE
 		auto location = hook::get_pattern("41 B9 04 00 00 00 C6 44 24 28 01 C7 44 24 20 16 00 00 00 E8", 19);
@@ -2238,23 +2218,23 @@ static HookFunction hookFunction([]()
 			virtual void InternalMain() override
 			{
 #ifdef GTA_FIVE
-				test(byte_ptr[rdi + 247], 0x10); // if ((rdi+247) & 0x10) {
+				test(byte_ptr[rdi + 247], 0x10);	// if ((rdi+247) & 0x10) {
 				jz("unsure");
-				L("sure"); // sure:
-				mov(eax, dword_ptr[rdi + 216]); //    eax = (rdi + 216)
-				cmp(eax, 0x1C); //    if (eax >= 0x1C) {
+				L("sure");							// sure:
+				mov(eax, dword_ptr[rdi + 216]);		//    eax = (rdi + 216)
+				cmp(eax, 0x1C);						//    if (eax >= 0x1C) {
 				jl("go");
-				and(byte_ptr[rdi + 247], ~0x10); //       (rdi + 247) &= ~0x10
-				or (byte_ptr[rdi + 248], 0x80); //       (rdi + 248) |=  0x80
-				jmp("go"); //    }
-				L("unsure"); // } else {
-				test(byte_ptr[rdi + 248], 0x80); //    if ((rdi+248) & 0x80) {
-				jnz("sure"); //        goto sure;
-							 //    }
-				mov(eax, 0xFFFFFFFF); //    eax = -1;
-				L("go"); // }
-				mov(byte_ptr[rdx + 0x6A], al); // (rdx + 0x6A) = eax
-				mov(rax, (uint64_t)origCall); // return to sender
+				and(byte_ptr[rdi + 247], ~0x10);    //       (rdi + 247) &= ~0x10
+				or (byte_ptr[rdi + 248], 0x80);		//       (rdi + 248) |=  0x80
+				jmp("go");							//    }
+				L("unsure");						// } else {
+				test(byte_ptr[rdi + 248], 0x80);	//    if ((rdi+248) & 0x80) {
+				jnz("sure");						//        goto sure;
+													//    }
+				mov(eax, 0xFFFFFFFF);				//    eax = -1;
+				L("go");							// }
+				mov(byte_ptr[rdx + 0x6A], al);		// (rdx + 0x6A) = eax
+				mov(rax, (uint64_t)origCall);		// return to sender
 				jmp(rax);
 #elif IS_RDR3
 				mov(eax, dword_ptr[rdi + 0x218]);
@@ -2292,8 +2272,6 @@ static HookFunction hookFunction([]()
 
 				mov(rdi, rbx);
 				mov(r13, rbx);
-
-				ret();
 #elif IS_RDR3
 				push(r14);
 				sub(rsp, 0x28);
@@ -2305,8 +2283,8 @@ static HookFunction hookFunction([]()
 				pop(r14);
 				mov(rdi, r14);
 				mov(bl, 0x7F);
-				ret();
 #endif
+				ret();
 			}
 
 			static void DoVoiceRoute(uint8_t* voiceData, int* outRoutes)
@@ -2334,18 +2312,17 @@ static HookFunction hookFunction([]()
 #endif
 		hook::call(location, computeVoiceRoutesStub.GetCode());
 	}
-
+#ifdef GTA_FIVE
 	// make sure a value that's needed to remove submix flag is set
 	{
-#ifdef GTA_FIVE
 		auto location = hook::get_pattern<char>("48 8B CB C7 44 24 28 58 CB 00 00 44 88 74 24 20 E8", -0x2C4);
 		hook::set_call(&g_origOddFunc, location + 0x2D4);
 
 		MH_Initialize();
 		MH_CreateHook(location, audEnvironmentSound_InitStub, (void**)&g_origaudEnvironmentSound_Init);
 		MH_EnableHook(location);
-#endif
 	}
+#endif
 
 	// triple audio command buffer size
 	{
@@ -2389,7 +2366,7 @@ static InitFunction initFunction([]()
 	fx::ScriptEngine::RegisterNativeHandler("CREATE_AUDIO_SUBMIX", [](fx::ScriptContext& ctx)
 	{
 		std::string name = ctx.CheckArgument<const char*>(0);
-
+		
 		if (audioRunning)
 		{
 			static std::map<uint32_t, int> submixesByName;
@@ -2529,7 +2506,11 @@ static InitFunction initFunction([]()
 
 	rage::OnInitFunctionInvoked.Connect([](rage::InitFunctionType type, const rage::InitFunctionData& data)
 	{
-		if (type == rage::InitFunctionType::INIT_CORE && data.funcHash == 0xE6D408DF /*0xF0F5A94D*/)
+#ifdef GTA_FIVE
+		if (type == rage::InitFunctionType::INIT_CORE && data.funcHash == /*0xE6D408DF*/ 0xF0F5A94D)
+#elif IS_RDR3
+		if (type == rage::InitFunctionType::INIT_CORE && data.funcHash == 0xE6D408DF)
+#endif
 		{
 #ifdef GTA_FIVE
 			std::string packFile;
@@ -2555,6 +2536,7 @@ static InitFunction initFunction([]()
 				wavePack = "x64/audio/sfx/dlc_AWXM2018";
 			}
 
+			
 			rage::fiPackfile* dlcAud = new rage::fiPackfile();
 			if (dlcAud->OpenPackfile(packFile.c_str(), true, 3, false))
 			{
@@ -2577,6 +2559,7 @@ static InitFunction initFunction([]()
 	{
 		netLibrary = lib;
 	});
+
 	OnGameFrame.Connect([]()
 	{
 		static ConVar<bool> arenaWarVariable("ui_disableMusicTheme", ConVar_Archive, false);
@@ -2594,8 +2577,7 @@ static InitFunction initFunction([]()
 			bool active = nui::HasMainUI() && (!netLibrary || netLibrary->GetConnectionState() == NetLibrary::CS_IDLE) && !arenaWarVariable.GetValue();
 			bool viaLoading = false;
 
-			if (launch::IsSDKGuest())
-			{
+			if (launch::IsSDKGuest()) {
 				active = false;
 			}
 			else
@@ -2635,12 +2617,12 @@ static InitFunction initFunction([]()
 				auto mixer = rage::audDriver::GetMixer();
 				mixer->InitClientThread("RenderThread", 0x8000);
 				auto submix = mixer->CreateSubmix("meme", 6, true);
-				// auto submix = (rage::audMixerSubmix*)((char*)mixer + 16);
+				//auto submix = (rage::audMixerSubmix*)((char*)mixer + 16);
 				submix->AddOutput(0, true, true);
 				submix->SetEffect(0, MakeRadioFX());
 				submix->SetEffectParam(0, HashString("default"), uint32_t(1));
 				submix->SetEffectParam(0, 0x1234, 25.f);
-				// submix->SetFlag(1, true);
+				//submix->SetFlag(1, true);
 
 				mixer->ComputeProcessingGraph();
 				mixer->FlagThreadCommandBufferReadyToProcess();
@@ -2768,8 +2750,7 @@ static InitFunction initFunction([]()
 		*sink = ref;
 	});
 
-	OnSetMumbleVolume.Connect([](float volume)
-	{
+	OnSetMumbleVolume.Connect([](float volume) {
 		auto controllerMgr = rage::audCategoryControllerManager::GetInstance();
 
 		if (!controllerMgr)
@@ -2790,7 +2771,7 @@ static InitFunction initFunction([]()
 		}
 	});
 
-	// nui::SetAudioSink(&g_audioSink);
+	//nui::SetAudioSink(&g_audioSink);
 });
 
 rage::audMixerDevice** rage::audDriver::sm_Mixer;
