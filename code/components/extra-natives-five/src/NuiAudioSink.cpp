@@ -1574,7 +1574,7 @@ void MumbleAudioEntity::PreUpdateService(uint32_t)
 		{
 			settings->SetVolumeCurveScale(1.0f);
 		}
-#ifdef GTA_FIVE		
+#ifdef GTA_FIVE
 		if (m_overrideVolume >= 0.0f)
 		{
 			settings->SetVolume(rage::GetDbForLinear(m_overrideVolume));
